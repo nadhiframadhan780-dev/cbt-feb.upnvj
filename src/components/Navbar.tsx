@@ -26,7 +26,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   setCurrentView,
   onOpenLoginModal
 }) => {
-  const { user, student, isAdmin, logout, selectedProgramSlug } = useAuth();
+  const { user, student, isAdmin, adminUser, logout, selectedProgramSlug } = useAuth();
+  const isStrictAdmin = isAdmin && adminUser?.email.toLowerCase().trim() === 'nadhiframadhan780@gmail.com';
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
@@ -152,7 +153,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               Bantuan
             </button>
 
-            {isAdmin && (
+            {isStrictAdmin && (
               <button
                 onClick={() => handleNavClick('admin')}
                 className={`px-3.5 py-2 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer ${
@@ -321,7 +322,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             Bantuan & Kontak
           </button>
-          {isAdmin && (
+          {isStrictAdmin && (
             <button
               onClick={() => handleNavClick('admin')}
               className="w-full text-left px-4 py-2.5 rounded-xl text-sm font-bold text-amber-800 bg-amber-50 flex items-center gap-2"

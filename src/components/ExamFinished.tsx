@@ -1,5 +1,6 @@
 import React from 'react';
 import { Exam, StudentProfile } from '../types';
+import { useAuth } from '../context/AuthContext';
 import { UPNVJ_LOGO } from '../constants/programs';
 import { 
   CheckCircle2, 
@@ -8,7 +9,9 @@ import {
   Calendar, 
   Clock, 
   ShieldCheck, 
-  Printer 
+  Printer,
+  LogOut,
+  ShieldAlert
 } from 'lucide-react';
 
 interface ExamFinishedProps {
@@ -28,13 +31,25 @@ export const ExamFinished: React.FC<ExamFinishedProps> = ({
   result,
   onBackToDashboard
 }) => {
+  const { logout } = useAuth();
+  const isDisqualified = result.score === 0 && result.percentage === 0;
+
+  const handleLogoutAndExit = async () => {
+    await logout();
+    window.location.reload();
+  };
+
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-slate-50 transition-colors">
       <div className="relative w-full max-w-xl rounded-3xl bg-white border border-slate-200 p-8 sm:p-10 shadow-xl text-center overflow-hidden">
         
         {/* Subtle Ambient Glow */}
-        <div className="absolute top-0 right-0 -mr-16 -mt-16 w-60 h-60 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-60 h-60 bg-teal-400/10 rounded-full blur-2xl pointer-events-none" />
+        <div className={`absolute top-0 right-0 -mr-16 -mt-16 w-60 h-60 rounded-full blur-2xl pointer-events-none ${
+          isDisqualified ? 'bg-rose-400/10' : 'bg-emerald-400/10'
+        }`} />
+        <div className={`absolute bottom-0 left-0 -ml-16 -mb-16 w-60 h-60 rounded-full blur-2xl pointer-events-none ${
+          isDisqualified ? 'bg-rose-500/10' : 'bg-teal-400/10'
+        }`} />
 
         {/* Institution Badge */}
         <div className="flex items-center justify-center gap-2 mb-6">
@@ -51,21 +66,43 @@ export const ExamFinished: React.FC<ExamFinishedProps> = ({
           </div>
         </div>
 
-        {/* Success Icon */}
-        <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-50 border-2 border-emerald-300 text-emerald-600 mb-6 shadow-xs animate-bounce">
-          <CheckCircle2 className="w-10 h-10" />
-        </div>
+        {/* Icon Status */}
+        {isDisqualified ? (
+          <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-full bg-rose-50 border-2 border-rose-300 text-rose-600 mb-6 shadow-xs">
+            <ShieldAlert className="w-10 h-10" />
+          </div>
+        ) : (
+          <div className="relative inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-50 border-2 border-emerald-300 text-emerald-600 mb-6 shadow-xs animate-bounce">
+            <CheckCircle2 className="w-10 h-10" />
+          </div>
+        )}
 
-        {/* Celebration Title */}
+        {/* Title */}
         <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-          Ujian Berhasil Dikumpulkan!
+          {isDisqualified ? 'Ujian Dihentikan & Didiskualifikasi' : 'Ujian Berhasil Dikumpulkan!'}
         </h2>
         <p className="mt-2 text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-          Seluruh jawaban Anda telah tersimpan dan diverifikasi di server cloud CBT Fakultas Ekonomi dan Bisnis UPNVJ.
+          {isDisqualified 
+            ? 'Ujian dihentikan oleh sistem pengawas otomatis akibat pelanggaran integritas keluar tab lebih dari 3 kali. Lembar ujian diberi nilai 0.'
+            : 'Seluruh jawaban Anda telah tersimpan dan diverifikasi di server cloud CBT Fakultas Ekonomi dan Bisnis UPNVJ.'
+          }
         </p>
 
-        {/* Result Card (If exam configured to show score) */}
-        {exam.showScore ? (
+        {/* Result Card */}
+        {isDisqualified ? (
+          <div className="my-6 p-6 rounded-3xl bg-rose-50 border border-rose-200 text-rose-950">
+            <span className="text-xs font-extrabold uppercase tracking-wider text-rose-800">
+              Hasil Evaluasi Integritas
+            </span>
+            <div className="mt-2 flex items-baseline justify-center gap-1 font-mono">
+              <span className="text-4xl sm:text-5xl font-black text-rose-700">0</span>
+              <span className="text-lg text-rose-500">/{result.totalPoints}</span>
+            </div>
+            <p className="mt-1 text-xs font-bold text-rose-700">
+              Status: DIDISKUALIFIKASI (Kecurangan Akademik)
+            </p>
+          </div>
+        ) : exam.showScore ? (
           <div className="my-6 p-6 rounded-3xl bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-200">
             <span className="text-xs font-bold uppercase tracking-wider text-teal-800">
               Perolehan Nilai Mentah
@@ -115,35 +152,43 @@ export const ExamFinished: React.FC<ExamFinishedProps> = ({
           </div>
           <div className="flex justify-between pt-2 border-t border-slate-200">
             <span className="text-slate-500">Waktu Penyerahan:</span>
-            <span className="font-mono font-semibold text-emerald-700">
+            <span className="font-mono font-semibold text-slate-900">
               {new Date().toLocaleTimeString('id-ID')} WIB
             </span>
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons with Complete Logout Option (Requirement 10) */}
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
           >
             <Printer className="w-4 h-4 text-slate-500" />
-            <span>Cetak Tanda Terima</span>
+            <span>Cetak Bukti</span>
           </button>
 
           <button
             onClick={onBackToDashboard}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-md shadow-teal-700/25 transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-md shadow-teal-700/25 transition-all cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Kembali ke Dashboard CBT</span>
+            <span>Dashboard CBT</span>
+          </button>
+
+          <button
+            onClick={handleLogoutAndExit}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/25 transition-all cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Keluar & Logout Otomatis</span>
           </button>
         </div>
 
         {/* Security Stamp */}
         <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
           <ShieldCheck className="w-4 h-4 text-teal-600" />
-          <span>Terverifikasi Digital Signature FEB UPNVJ</span>
+          <span>Terverifikasi Digital Signature CBT FEB UPNVJ</span>
         </div>
 
       </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { STUDY_PROGRAMS, COHORTS, UPNVJ_LOGO } from '../constants/programs';
+import { STUDY_PROGRAMS, COHORTS, UPNVJ_LOGO, PRODI_COURSES_MAP } from '../constants/programs';
 import { 
   X, 
   ShieldAlert, 
@@ -79,6 +79,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
       program: matchedProg?.name || 'S1 Akuntansi',
       programSlug: prodiSlug,
       cohort: demoCohort,
+      semester: 1,
+      courses: PRODI_COURSES_MAP[prodiSlug]?.[1] || ['Pengantar Akuntansi I', 'Mikroekonomi'],
       active: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

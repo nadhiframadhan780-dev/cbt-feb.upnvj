@@ -116,6 +116,33 @@ export const PeraturanKetentuanPage: React.FC<PeraturanKetentuanPageProps> = ({ 
         </div>
       </div>
 
+      {/* KETENTUAN KHUSUS SMARTPHONE / HP (Requirement 9) */}
+      <div className="p-6 rounded-3xl bg-amber-50/90 border-2 border-amber-400 shadow-sm mb-8 flex flex-col md:flex-row items-start gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+          <Clock className="w-6 h-6" />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-200 border border-amber-400 text-amber-950 font-extrabold text-[10px] uppercase tracking-wider">
+              Penting & Wajib Dibaca
+            </span>
+            <span className="text-xs font-bold text-amber-900">Ketentuan Pengerjaan Melalui Smartphone / HP</span>
+          </div>
+          <h3 className="text-base font-extrabold text-amber-950 mt-1">
+            Wajib Mengatur Waktu Tunggu Layar (Screen Timeout) Minimal 30 Menit
+          </h3>
+          <p className="text-xs text-amber-900 leading-relaxed mt-1.5">
+            Bagi mahasiswa yang terpaksa mengerjakan soal menggunakan Smartphone/HP, <b>WAJIB mengatur batas waktu tidur layar (Screen Timeout / Layar Kunci Otomatis) sekurang-kurangnya 30 menit atau 'Jangan Pernah Mati'</b> sebelum menekan tombol Mulai Ujian. 
+          </p>
+          <div className="mt-3 p-3 bg-white rounded-xl border border-amber-300 text-xs text-amber-950 space-y-1">
+            <p className="font-semibold text-amber-900">Mengapa pengaturan ini mutlak diperlukan?</p>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Jika layar ponsel padam/mati saat Anda sedang membaca soal atau berpikir, sistem operasi seluler akan memicu pemutusan fokus browser (blur/hidden event). Hal ini akan <b>secara otomatis terhitung oleh sistem pengawas sebagai aktivitas keluar dari tab (indikasi kecurangan)</b>. Jika peringatan terakumulasi lebih dari 3 kali, ujian Anda akan otomatis terkumpul dengan <b>NILAI 0</b>.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Category Pills & Quick Search */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0">

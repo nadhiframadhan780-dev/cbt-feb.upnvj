@@ -8,7 +8,7 @@ export type QuestionType =
   | 'essay'
   | 'short_answer';
 
-export type ExamAttemptStatus = 'in_progress' | 'submitted' | 'expired';
+export type ExamAttemptStatus = 'in_progress' | 'submitted' | 'expired' | 'disqualified';
 
 export interface StudyProgram {
   id: string;
@@ -31,6 +31,8 @@ export interface StudentProfile {
   program: string;
   programSlug: string;
   cohort: string;
+  semester: number; // Semester 1 - 8
+  courses: string[]; // Daftar mata kuliah yang diambil di semester tsb
   photoUrl?: string;
   active: boolean;
   createdAt: string;
@@ -52,6 +54,8 @@ export interface Course {
   code: string;
   programSlug: string;
   lecturer: string;
+  semester?: number; // 1-8
+  sks?: number;
   active: boolean;
 }
 
@@ -68,6 +72,8 @@ export interface Exam {
   examType: ExamType;
   startAt: string; // ISO 8601 string or timestamp
   endAt: string;
+  publishDate?: string; // YYYY-MM-DD
+  publishTime?: string; // HH:mm
   durationMinutes: number;
   instructions: string;
   showScore: boolean;
@@ -110,6 +116,8 @@ export interface ExamAttempt {
   score?: number;
   totalPoints?: number;
   percentage?: number;
+  violationCount?: number; // Cheating attempt / tab leave count
+  disqualificationReason?: string;
 }
 
 export interface StudentAnswer {
@@ -134,4 +142,24 @@ export interface AdminUser {
   name: string;
   role: 'admin' | 'superadmin';
   createdAt: string;
+}
+
+export interface CourseGrade {
+  courseCode: string;
+  courseName: string;
+  sks: number;
+  utsScore?: number;
+  uasScore?: number;
+  assignmentScore?: number;
+  finalScore: number;
+  letterGrade: string;
+  gradePoint: number;
+}
+
+export interface StyledNotification {
+  id: string;
+  type: 'success' | 'warning' | 'error' | 'info';
+  title: string;
+  message: string;
+  duration?: number;
 }

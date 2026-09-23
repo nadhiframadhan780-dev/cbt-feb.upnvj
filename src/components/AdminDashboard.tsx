@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { 
   StudentProfile, 
   Course, 
   Exam, 
   DeanProfile,
-  ExamAttempt 
+  ExamAttempt,
+  Question,
+  QuestionOption
 } from '../types';
 import { 
   DEFAULT_STUDENTS, 
@@ -14,10 +17,26 @@ import {
   DEFAULT_DEAN_PROFILE,
   seedInitialFirestoreData,
   getDeanProfile,
-  updateDeanProfile
+  updateDeanProfile,
+  getAllStudents,
+  saveStudentProfile,
+  saveBulkStudents,
+  deleteStudentProfile,
+  getAllExams,
+  saveExam,
+  getQuestionsForExam,
+  saveQuestion,
+  saveBulkQuestions,
+  getAllAttempts
 } from '../services/firestoreService';
-import { STUDY_PROGRAMS, COHORTS } from '../constants/programs';
-import { formatIndonesianTime } from '../utils/formatters';
+import { STUDY_PROGRAMS, COHORTS, SEMESTERS, PRODI_COURSES_MAP } from '../constants/programs';
+import { 
+  downloadQuestionTemplate, 
+  downloadStudentTemplate, 
+  parseQuestionsFile, 
+  parseStudentsFile 
+} from '../utils/fileImportExport';
+import { formatIndonesianDate, formatIndonesianTime } from '../utils/formatters';
 import { 
   Users, 
   Calendar, 
@@ -33,7 +52,18 @@ import {
   Sparkles,
   Save,
   BarChart3,
-  FileSpreadsheet
+  FileSpreadsheet,
+  UploadCloud,
+  FileArchive,
+  Clock,
+  Lock,
+  ShieldCheck,
+  AlertTriangle,
+  RefreshCw,
+  Image as ImageIcon,
+  Check,
+  Eye,
+  BookOpen
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -41,478 +71,772 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) => {
-  const { adminUser, isAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'exams' | 'results' | 'dean'>('overview');
+  const { adminUser, isAdmin, logout } = useAuth();
+  const { showToast, showModalAlert } = useNotification();
 
-  // Local state for admin management
+  // Active Main Tabs: 'monitoring' | 'students' | 'exams' | 'dean'
+  const [activeTab, setActiveTab] = useState<'monitoring' | 'students' | 'exams' | 'dean'>('monitoring');
+
+  // State
   const [students, setStudents] = useState<StudentProfile[]>(DEFAULT_STUDENTS);
-  const [courses] = useState<Course[]>(DEFAULT_COURSES);
-  const [exams] = useState<Exam[]>(getDefaultExams());
+  const [exams, setExams] = useState<Exam[]>(getDefaultExams());
   const [dean, setDean] = useState<DeanProfile>(DEFAULT_DEAN_PROFILE);
-  const [results, setResults] = useState<ExamAttempt[]>([]);
-  
-  // Feedback toasts
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [loadingSeed, setLoadingSeed] = useState(false);
+  const [attempts, setAttempts] = useState<ExamAttempt[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Student search & filters
+  // Proctoring / Monitoring filters
+  const [monitorProdi, setMonitorProdi] = useState('all');
+  const [monitorExamId, setMonitorExamId] = useState('all');
+  const [monitorSearch, setMonitorSearch] = useState('');
+
+  // Structured Students Tab (Requirement 4: Per Prodi)
+  const [selectedProdiSlug, setSelectedProdiSlug] = useState<string>('cbt-s1-akuntansi');
   const [studentSearch, setStudentSearch] = useState('');
-  const [filterProdi, setFilterProdi] = useState('all');
-  const [filterCohort, setFilterCohort] = useState('all');
+  const [studentCohortFilter, setStudentCohortFilter] = useState('all');
+  const [studentSemesterFilter, setStudentSemesterFilter] = useState('all');
 
-  // New Student modal form
+  // Modal: Add Single Student
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
-  const [newStudent, setNewStudent] = useState<Partial<StudentProfile>>({
-    name: '',
+  const [newStudent, setNewStudent] = useState({
     nim: '',
+    name: '',
     email: '',
-    programSlug: 'cbt-s1-akuntansi',
     cohort: '2026',
-    active: true
+    semester: 1,
+    courses: [] as string[]
   });
+  const [customCourseInput, setCustomCourseInput] = useState('');
 
-  // Load Dean profile on mount
+  // Bulk Upload Student
+  const studentFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingStudents, setUploadingStudents] = useState(false);
+
+  // Question Management (Requirement 3)
+  const [selectedExamId, setSelectedExamId] = useState<string>(exams[0]?.id || '');
+  const [examQuestions, setExamQuestions] = useState<Question[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
+
+  // Modal: Add Question
+  const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
+  const [newQ, setNewQ] = useState<Partial<Question>>({
+    type: 'multiple_choice',
+    question: '',
+    imageUrl: '',
+    points: 10,
+    correctAnswer: 'A',
+    options: [
+      { id: 'A', text: '' },
+      { id: 'B', text: '' },
+      { id: 'C', text: '' },
+      { id: 'D', text: '' },
+      { id: 'E', text: '' }
+    ]
+  });
+  const questionFileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingQuestions, setUploadingQuestions] = useState(false);
+
+  // Exam Schedule Setting State
+  const activeExam = exams.find(e => e.id === selectedExamId);
+  const [schedPublishDate, setSchedPublishDate] = useState<string>(activeExam?.publishDate || '');
+  const [schedPublishTime, setSchedPublishTime] = useState<string>(activeExam?.publishTime || '08:00');
+  const [schedDuration, setSchedDuration] = useState<number>(activeExam?.durationMinutes || 90);
+
+  // Load initial data
   useEffect(() => {
-    async function load() {
-      const p = await getDeanProfile();
-      setDean(p);
-
-      // Sample results
-      const sampleResults: ExamAttempt[] = [
-        {
-          id: 'att-101',
-          examId: 'exam-s1-akuntansi-uts',
-          studentId: '2310111001',
-          uid: 'uid-nadhif',
-          nim: '2310111001',
-          studentName: 'Nadhif Ramadhan',
-          programSlug: 'cbt-s1-akuntansi',
-          cohort: '2026',
-          startedAt: new Date(Date.now() - 3600000).toISOString(),
-          submittedAt: new Date(Date.now() - 900000).toISOString(),
-          status: 'submitted',
-          score: 85,
-          totalPoints: 100,
-          percentage: 85
-        },
-        {
-          id: 'att-102',
-          examId: 'exam-s1-manajemen-uts',
-          studentId: '2410112045',
-          uid: 'uid-siti',
-          nim: '2410112045',
-          studentName: 'Siti Rahmawati',
-          programSlug: 'cbt-s1-manajemen',
-          cohort: '2025',
-          startedAt: new Date(Date.now() - 4000000).toISOString(),
-          submittedAt: new Date(Date.now() - 1200000).toISOString(),
-          status: 'submitted',
-          score: 90,
-          totalPoints: 100,
-          percentage: 90
-        },
-        {
-          id: 'att-103',
-          examId: 'exam-d3-perbankan-keuangan-uts',
-          studentId: '2510115012',
-          uid: 'uid-ahmad',
-          nim: '2510115012',
-          studentName: 'Ahmad Faiz Fadhlurrahman',
-          programSlug: 'cbt-d3-perbankan-keuangan',
-          cohort: '2026',
-          startedAt: new Date(Date.now() - 2000000).toISOString(),
-          submittedAt: undefined,
-          status: 'in_progress',
-          score: undefined,
-          totalPoints: 100
-        }
-      ];
-      setResults(sampleResults);
-    }
-    load();
+    loadAllData();
   }, []);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  // Update schedule inputs when selected exam changes
+  useEffect(() => {
+    if (activeExam) {
+      setSchedPublishDate(activeExam.publishDate || '');
+      setSchedPublishTime(activeExam.publishTime || '08:00');
+      setSchedDuration(activeExam.durationMinutes || 90);
+      loadQuestions(activeExam.id);
+    }
+  }, [selectedExamId, activeExam]);
 
-  // Seed / Sync database
-  const handleSeedDatabase = async () => {
-    setLoadingSeed(true);
-    const res = await seedInitialFirestoreData();
-    setLoadingSeed(false);
-    showToast(res.message);
-  };
+  // Update default courses when semester changes in Add Student Modal
+  useEffect(() => {
+    if (selectedProdiSlug && newStudent.semester) {
+      const defaultList = PRODI_COURSES_MAP[selectedProdiSlug]?.[newStudent.semester] || [];
+      setNewStudent(prev => ({ ...prev, courses: defaultList }));
+    }
+  }, [selectedProdiSlug, newStudent.semester]);
 
-  // Save Dean Profile to Firestore
-  const handleSaveDean = async () => {
-    const ok = await updateDeanProfile(dean);
-    if (ok) {
-      showToast('Profil dan sambutan Dekan FEB berhasil diperbarui di Firestore!');
-    } else {
-      showToast('Gagal memperbarui profil Dekan di server.');
+  const loadAllData = async () => {
+    setLoading(true);
+    try {
+      const [stdData, exData, dData, attData] = await Promise.all([
+        getAllStudents(),
+        getAllExams(),
+        getDeanProfile(),
+        getAllAttempts()
+      ]);
+      setStudents(stdData);
+      setExams(exData);
+      setDean(dData);
+      setAttempts(attData);
+
+      if (exData.length > 0 && !selectedExamId) {
+        setSelectedExamId(exData[0].id);
+      }
+    } catch (e) {
+      console.error('Error loading admin data:', e);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Add student
-  const handleAddStudent = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStudent.name || !newStudent.nim || !newStudent.email || !newStudent.programSlug) {
-      showToast('Semua data mahasiswa wajib diisi!');
+  const loadQuestions = async (examId: string) => {
+    setLoadingQuestions(true);
+    try {
+      const qList = await getQuestionsForExam(examId);
+      setExamQuestions(qList);
+    } catch (e) {
+      console.error('Error loading questions:', e);
+    } finally {
+      setLoadingQuestions(false);
+    }
+  };
+
+  // STRICT ACCESS CHECK (Requirement 2)
+  if (!isAdmin || adminUser?.email.toLowerCase().trim() !== 'nadhiframadhan780@gmail.com') {
+    return (
+      <div className="min-h-[75vh] flex items-center justify-center p-6 text-center">
+        <div className="max-w-md p-8 rounded-3xl bg-white border border-slate-200 shadow-xl">
+          <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto mb-4">
+            <Lock className="w-7 h-7" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-2">
+            Akses Dibatasi — Administrator Only
+          </h3>
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+            Halaman ini membutuhkan hak otorisasi akun Google resmi <b className="text-slate-800 font-mono">nadhiframadhan780@gmail.com</b>. Akun Anda saat ini tidak memiliki izin akses.
+          </p>
+          <button
+            onClick={onBackToHome}
+            className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer"
+          >
+            Kembali ke Beranda
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Current selected prodi name
+  const currentProdi = STUDY_PROGRAMS.find(p => p.slug === selectedProdiSlug) || STUDY_PROGRAMS[0];
+
+  // Filtered Students for the selected prodi
+  const filteredStudents = students.filter(s => {
+    if (s.programSlug !== selectedProdiSlug) return false;
+    if (studentCohortFilter !== 'all' && s.cohort !== studentCohortFilter) return false;
+    if (studentSemesterFilter !== 'all' && s.semester !== Number(studentSemesterFilter)) return false;
+    if (studentSearch.trim()) {
+      const q = studentSearch.toLowerCase();
+      return s.name.toLowerCase().includes(q) || s.nim.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  // Handle Save Student
+  const handleSaveStudent = async () => {
+    if (!newStudent.nim.trim() || !newStudent.name.trim()) {
+      showToast('error', 'Validasi Gagal', 'NIM dan Nama Lengkap wajib diisi.');
       return;
     }
 
-    const prog = STUDY_PROGRAMS.find(p => p.slug === newStudent.programSlug);
-    const fullProfile: StudentProfile = {
-      uid: 'std-' + newStudent.nim,
-      email: newStudent.email.toLowerCase().trim(),
-      name: newStudent.name.trim(),
+    const email = newStudent.email.trim() || `${newStudent.nim.trim()}@mahasiswa.upnvj.ac.id`;
+    const studentProfile: StudentProfile = {
+      uid: `uid_${newStudent.nim.trim()}`,
       nim: newStudent.nim.trim(),
-      program: prog?.name || 'S1 Akuntansi',
-      programSlug: newStudent.programSlug,
-      cohort: newStudent.cohort || '2026',
-      active: newStudent.active ?? true,
+      name: newStudent.name.trim(),
+      email,
+      program: currentProdi.name,
+      programSlug: selectedProdiSlug,
+      cohort: newStudent.cohort,
+      semester: newStudent.semester,
+      courses: newStudent.courses,
+      active: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    setStudents(prev => [fullProfile, ...prev]);
-    setShowAddStudentModal(false);
-    setNewStudent({
-      name: '',
-      nim: '',
-      email: '',
-      programSlug: 'cbt-s1-akuntansi',
-      cohort: '2026',
-      active: true
-    });
-    showToast(`Mahasiswa ${fullProfile.name} (${fullProfile.nim}) berhasil ditambahkan!`);
-  };
-
-  // Toggle student active
-  const toggleStudentActive = (nim: string) => {
-    setStudents(prev => prev.map(s => s.nim === nim ? { ...s, active: !s.active } : s));
-    showToast('Status aktif mahasiswa berhasil diperbarui.');
-  };
-
-  // Delete student
-  const deleteStudent = (nim: string) => {
-    if (window.confirm(`Hapus data mahasiswa dengan NIM ${nim}?`)) {
-      setStudents(prev => prev.filter(s => s.nim !== nim));
-      showToast(`Mahasiswa NIM ${nim} telah dihapus.`);
+    const ok = await saveStudentProfile(studentProfile);
+    if (ok) {
+      setStudents(prev => [studentProfile, ...prev.filter(s => s.nim !== studentProfile.nim)]);
+      setShowAddStudentModal(false);
+      showToast('success', 'Data Tersimpan', `Mahasiswa ${studentProfile.name} (${studentProfile.nim}) berhasil ditambahkan ke ${currentProdi.shortName}!`);
+      setNewStudent({
+        nim: '',
+        name: '',
+        email: '',
+        cohort: '2026',
+        semester: 1,
+        courses: PRODI_COURSES_MAP[selectedProdiSlug]?.[1] || []
+      });
+    } else {
+      showToast('error', 'Gagal', 'Terjadi kendala saat menyimpan ke database Firestore.');
     }
   };
 
-  // Export results to CSV
-  const exportResultsToCSV = () => {
-    const headers = ['Nama Mahasiswa', 'NIM', 'Program Studi', 'Angkatan', 'Ujian ID', 'Status', 'Nilai', 'Mulai', 'Selesai'];
-    const rows = results.map(r => [
-      `"${r.studentName}"`,
-      `"${r.nim}"`,
-      `"${r.programSlug}"`,
-      `"${r.cohort}"`,
-      `"${r.examId}"`,
-      `"${r.status}"`,
-      r.score ?? '-',
-      `"${r.startedAt}"`,
-      `"${r.submittedAt || '-'}"`
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Hasil_CBT_FEB_UPNVJ_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Laporan CSV Hasil CBT berhasil diunduh!');
+  // Handle Delete Student
+  const handleDeleteStudent = async (nim: string, name: string) => {
+    if (!window.confirm(`Hapus data mahasiswa ${name} (${nim}) dari pangkalan data?`)) return;
+    const ok = await deleteStudentProfile(nim);
+    if (ok) {
+      setStudents(prev => prev.filter(s => s.nim !== nim));
+      showToast('success', 'Terhapus', `Data mahasiswa ${name} telah dihapus.`);
+    }
   };
 
-  // Filtered students list
-  const filteredStudents = students.filter(s => {
-    const matchSearch = s.name.toLowerCase().includes(studentSearch.toLowerCase()) || s.nim.includes(studentSearch);
-    const matchProdi = filterProdi === 'all' || s.programSlug === filterProdi;
-    const matchCohort = filterCohort === 'all' || s.cohort === filterCohort;
-    return matchSearch && matchProdi && matchCohort;
+  // Handle Bulk Upload Students (CSV, XLS/XLSX, ZIP)
+  const handleUploadStudentsFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingStudents(true);
+    try {
+      const parsed = await parseStudentsFile(file, selectedProdiSlug, currentProdi.name);
+      const count = await saveBulkStudents(parsed);
+      
+      // Update local state
+      setStudents(prev => {
+        const existingMap = new Map(prev.map(s => [s.nim, s]));
+        parsed.forEach(p => existingMap.set(p.nim, p));
+        return Array.from(existingMap.values());
+      });
+
+      showToast('success', 'Impor Berhasil!', `Sebanyak ${count} data mahasiswa berhasil diimpor ke ${currentProdi.shortName}.`);
+    } catch (err: any) {
+      showModalAlert('error', 'Gagal Mengunggah Berkas', err.message || 'Format berkas tidak sesuai.', 'Format Salah');
+    } finally {
+      setUploadingStudents(false);
+      if (studentFileInputRef.current) {
+        studentFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle Save Exam Schedule (Publish Date & Time)
+  const handleSaveExamSchedule = async () => {
+    if (!activeExam) return;
+
+    const updated: Exam = {
+      ...activeExam,
+      publishDate: schedPublishDate,
+      publishTime: schedPublishTime,
+      durationMinutes: Number(schedDuration),
+      startAt: `${schedPublishDate}T${schedPublishTime}:00`,
+      updatedAt: new Date().toISOString()
+    };
+
+    const ok = await saveExam(updated);
+    if (ok) {
+      setExams(prev => prev.map(e => e.id === updated.id ? updated : e));
+      showToast('success', 'Jadwal Diperbarui', `Jadwal publish otomatis untuk ${activeExam.title} berhasil disimpan.`);
+    }
+  };
+
+  // Handle Add Single Question (Requirement 3)
+  const handleSaveQuestion = async () => {
+    if (!selectedExamId || !newQ.question?.trim()) {
+      showToast('error', 'Validasi Gagal', 'Naskah pertanyaan soal wajib diisi.');
+      return;
+    }
+
+    const order = examQuestions.length + 1;
+    const questionObj: Question = {
+      id: `q_${selectedExamId}_${order}_${Date.now().toString(36)}`,
+      examId: selectedExamId,
+      order,
+      type: newQ.type || 'multiple_choice',
+      question: newQ.question.trim(),
+      imageUrl: newQ.imageUrl?.trim() || undefined,
+      options: (newQ.type === 'multiple_choice' || newQ.type === 'multiple_choice_image') ? newQ.options : undefined,
+      correctAnswer: newQ.correctAnswer || 'A',
+      points: Number(newQ.points) || 10
+    };
+
+    const ok = await saveQuestion(questionObj);
+    if (ok) {
+      setExamQuestions(prev => [...prev, questionObj]);
+      setShowAddQuestionModal(false);
+      showToast('success', 'Soal Ditambahkan', `Soal nomor ${order} berhasil ditambahkan.`);
+      setNewQ({
+        type: 'multiple_choice',
+        question: '',
+        imageUrl: '',
+        points: 10,
+        correctAnswer: 'A',
+        options: [
+          { id: 'A', text: '' },
+          { id: 'B', text: '' },
+          { id: 'C', text: '' },
+          { id: 'D', text: '' },
+          { id: 'E', text: '' }
+        ]
+      });
+    }
+  };
+
+  // Handle Bulk Upload Questions (CSV, XLS/XLSX, ZIP)
+  const handleUploadQuestionsFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedExamId) return;
+
+    setUploadingQuestions(true);
+    try {
+      const parsed = await parseQuestionsFile(file, selectedExamId);
+      const count = await saveBulkQuestions(parsed);
+      setExamQuestions(parsed);
+      showToast('success', 'Unggah Soal Sukses!', `Sebanyak ${count} butir soal berhasil diimpor ke sistem.`);
+    } catch (err: any) {
+      showModalAlert('error', 'Gagal Mengimpor Soal', err.message || 'Periksa kembali struktur kolom pada berkas.', 'Error Import');
+    } finally {
+      setUploadingQuestions(false);
+      if (questionFileInputRef.current) {
+        questionFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  // Handle Image Upload for Single Question
+  const handleQuestionImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setNewQ(prev => ({ ...prev, imageUrl: reader.result as string }));
+      showToast('info', 'Gambar Terpilih', 'Pratinjau gambar berhasil dimuat.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Proctoring Table Data Calculation (Requirement 8)
+  const proctoringStudents = students.filter(s => {
+    if (monitorProdi !== 'all' && s.programSlug !== monitorProdi) return false;
+    if (monitorSearch.trim()) {
+      const q = monitorSearch.toLowerCase();
+      return s.name.toLowerCase().includes(q) || s.nim.toLowerCase().includes(q);
+    }
+    return true;
   });
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-colors">
-      
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-700 text-xs font-semibold flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
-          <Sparkles className="w-4 h-4 text-amber-400" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+  const getStudentAttempt = (nim: string) => {
+    return attempts.find(a => a.nim === nim);
+  };
 
-      {/* Top Admin Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-200 mb-8">
-        <div className="flex items-center gap-3.5">
+  // Monitoring Counts
+  const totalMonitored = proctoringStudents.length;
+  const inProgressCount = proctoringStudents.filter(s => getStudentAttempt(s.nim)?.status === 'in_progress').length;
+  const submittedCount = proctoringStudents.filter(s => getStudentAttempt(s.nim)?.status === 'submitted').length;
+  const disqualifiedCount = proctoringStudents.filter(s => getStudentAttempt(s.nim)?.status === 'disqualified').length;
+  const notStartedCount = totalMonitored - (inProgressCount + submittedCount + disqualifiedCount);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 transition-colors">
+      
+      {/* Top Header & Identity */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-3">
           <button
             onClick={onBackToHome}
-            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer shadow-xs"
-            title="Kembali ke Beranda"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
+            <span>Kembali ke Beranda</span>
           </button>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
-                Admin Portal CBT FEB UPNVJ
-              </h1>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
-                Superadmin
-              </span>
-            </div>
-            <p className="text-xs text-slate-500">
-              Pengelolaan Mahasiswa, Jadwal Ujian, Butir Soal, dan Laporan Hasil Akademik
-            </p>
+
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+            <span className="text-xs font-bold text-slate-700">Administrator Panel FEB</span>
           </div>
         </div>
 
-        {/* Action: 1-Click Database Sync */}
+        {/* Admin Logged In Identity */}
         <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block">
+            <p className="text-xs font-extrabold text-slate-900">{adminUser?.name}</p>
+            <p className="text-[10px] font-mono text-teal-700">{adminUser?.email}</p>
+          </div>
           <button
-            disabled={loadingSeed}
-            onClick={handleSeedDatabase}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-50 border border-teal-300 text-teal-800 font-bold text-xs hover:bg-teal-100 transition-colors cursor-pointer"
+            onClick={async () => {
+              await logout();
+              onBackToHome();
+            }}
+            className="px-3.5 py-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 text-xs font-bold transition-colors cursor-pointer"
           >
-            <Database className="w-4 h-4 text-teal-700" />
-            <span>{loadingSeed ? 'Menyinkronkan...' : 'Sinkronkan / Inisialisasi Firestore'}</span>
+            Keluar Admin
           </button>
         </div>
       </div>
 
-      {/* Admin Tab Navigation Bar */}
-      <div className="flex items-center space-x-2 overflow-x-auto pb-3 mb-8 border-b border-slate-200">
+      {/* Main Admin Navigation Tabs */}
+      <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl border border-slate-200 mb-8 overflow-x-auto">
         <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
-            activeTab === 'overview'
-              ? 'bg-teal-700 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
+          onClick={() => setActiveTab('monitoring')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+            activeTab === 'monitoring'
+              ? 'bg-white text-teal-800 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <BarChart3 className="w-4 h-4" />
-          <span>Ringkasan</span>
+          <BarChart3 className="w-4 h-4 text-teal-600" />
+          <span>Pemantauan Ujian Real-Time</span>
         </button>
 
         <button
           onClick={() => setActiveTab('students')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'students'
-              ? 'bg-teal-700 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-white text-teal-800 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Users className="w-4 h-4" />
-          <span>Mahasiswa ({students.length})</span>
+          <Users className="w-4 h-4 text-teal-600" />
+          <span>Manajemen Mahasiswa per Prodi</span>
         </button>
 
         <button
           onClick={() => setActiveTab('exams')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'exams'
-              ? 'bg-teal-700 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-white text-teal-800 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Calendar className="w-4 h-4" />
-          <span>Jadwal Ujian ({exams.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('results')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
-            activeTab === 'results'
-              ? 'bg-teal-700 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <FileSpreadsheet className="w-4 h-4" />
-          <span>Hasil Ujian ({results.length})</span>
+          <Calendar className="w-4 h-4 text-teal-600" />
+          <span>Bank Soal & Jadwal Publish</span>
         </button>
 
         <button
           onClick={() => setActiveTab('dean')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'dean'
-              ? 'bg-teal-700 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
+              ? 'bg-white text-teal-800 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Award className="w-4 h-4" />
-          <span>Sambutan Dekan</span>
+          <Award className="w-4 h-4 text-amber-600" />
+          <span>Sambutan Dekan & Database</span>
         </button>
       </div>
 
-      {/* TAB 1: OVERVIEW METRICS */}
-      {activeTab === 'overview' && (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Mahasiswa Terdaftar</span>
-              <p className="text-3xl font-extrabold text-slate-900 font-mono mt-2">{students.length}</p>
-              <span className="text-[11px] text-teal-700 mt-1 block">6 Program Studi Aktif</span>
+      {/* ================= TAB 1: PEMANTAUAN UJIAN REAL-TIME (Requirement 8) ================= */}
+      {activeTab === 'monitoring' && (
+        <div className="space-y-6">
+          
+          {/* KPI Monitoring Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+            <div className="p-5 rounded-3xl bg-white border border-slate-200 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Total Peserta</span>
+              <p className="text-2xl font-black text-slate-900 mt-1">{totalMonitored}</p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Program Studi</span>
-              <p className="text-3xl font-extrabold text-teal-700 font-mono mt-2">6</p>
-              <span className="text-[11px] text-slate-500 mt-1 block">2 D3 & 4 S1</span>
+            <div className="p-5 rounded-3xl bg-emerald-50 border border-emerald-200 text-emerald-950 shadow-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-[10px] uppercase font-bold text-emerald-800">Sedang Mengerjakan</span>
+              </div>
+              <p className="text-2xl font-black text-emerald-900 mt-1">{inProgressCount}</p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sesi Ujian Aktif (LIVE)</span>
-              <p className="text-3xl font-extrabold text-amber-700 font-mono mt-2">6</p>
-              <span className="text-[11px] text-amber-700 mt-1 block">Tersedia di seluruh prodi</span>
+            <div className="p-5 rounded-3xl bg-teal-50 border border-teal-200 text-teal-950 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-teal-800">Selesai Terkumpul</span>
+              <p className="text-2xl font-black text-teal-900 mt-1">{submittedCount}</p>
             </div>
 
-            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Penyerahan Lembar Jawaban</span>
-              <p className="text-3xl font-extrabold text-emerald-700 font-mono mt-2">{results.length}</p>
-              <span className="text-[11px] text-emerald-700 mt-1 block">Tersimpan di Cloud Firestore</span>
+            <div className="p-5 rounded-3xl bg-slate-50 border border-slate-200 text-slate-800 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-slate-500">Belum Memulai</span>
+              <p className="text-2xl font-black text-slate-700 mt-1">{notStartedCount}</p>
+            </div>
+
+            <div className="p-5 rounded-3xl bg-rose-50 border border-rose-200 text-rose-950 shadow-xs">
+              <span className="text-[10px] uppercase font-bold text-rose-800">Didiskualifikasi</span>
+              <p className="text-2xl font-black text-rose-700 mt-1">{disqualifiedCount}</p>
             </div>
           </div>
 
-          {/* Quick Action Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
-              <h3 className="text-base font-bold text-slate-900 mb-2">
-                Pusat Kontrol Akses Berbasis Prodi & Angkatan
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                Sistem secara ketat menerapkan isolasi data di mana mahasiswa D3 Akuntansi hanya dapat mengakses ujian D3 Akuntansi, dan S1 Akuntansi hanya melihat soal miliknya.
-              </p>
-              <button
-                onClick={() => setActiveTab('students')}
-                className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer transition-colors"
-              >
-                Kelola Mahasiswa
-              </button>
+          {/* Filter Bar & Refresh Button */}
+          <div className="p-4 rounded-2xl bg-white border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Filter Program Studi:</label>
+                <select
+                  value={monitorProdi}
+                  onChange={(e) => setMonitorProdi(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-300 bg-white font-semibold text-slate-800"
+                >
+                  <option value="all">Semua Program Studi (FEB)</option>
+                  {STUDY_PROGRAMS.map(p => (
+                    <option key={p.slug} value={p.slug}>{p.shortName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Cari Mahasiswa:</label>
+                <input
+                  type="text"
+                  placeholder="Ketik nama atau NIM..."
+                  value={monitorSearch}
+                  onChange={(e) => setMonitorSearch(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs w-56"
+                />
+              </div>
             </div>
 
-            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
-              <h3 className="text-base font-bold text-slate-900 mb-2">
-                Ekspor Laporan Nilai UTS & UAS
-              </h3>
-              <p className="text-xs text-slate-600 leading-relaxed mb-4">
-                Unduh seluruh data nilai, waktu pengerjaan, dan status submit mahasiswa dalam format berkas CSV siap olah untuk SIMAK UPNVJ.
-              </p>
-              <button
-                onClick={exportResultsToCSV}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                <span>Unduh Laporan Nilai CSV</span>
-              </button>
-            </div>
+            <button
+              onClick={loadAllData}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold hover:bg-teal-100 transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Segarkan Monitoring</span>
+            </button>
           </div>
+
+          {/* Real-Time Proctoring Monitoring Table */}
+          <div className="rounded-3xl bg-white border border-slate-200 p-6 shadow-xs overflow-hidden">
+            <h3 className="font-extrabold text-sm text-slate-900 mb-4">
+              Status Pengerjaan Mahasiswa (Pengawas Akademik Digital)
+            </h3>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100 text-slate-700 uppercase font-bold tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3.5">NIM</th>
+                    <th className="px-4 py-3.5">Nama Mahasiswa</th>
+                    <th className="px-4 py-3.5">Program Studi</th>
+                    <th className="px-4 py-3.5">Status Pengerjaan</th>
+                    <th className="px-4 py-3.5">Waktu Mulai</th>
+                    <th className="px-4 py-3.5">Nilai / Skor</th>
+                    <th className="px-4 py-3.5 text-center">Peringatan Kecurangan</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {proctoringStudents.map((std) => {
+                    const att = getStudentAttempt(std.nim);
+                    let statusBadge = (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-semibold text-[10px]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                        Belum Memulai
+                      </span>
+                    );
+
+                    if (att?.status === 'in_progress') {
+                      statusBadge = (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" />
+                          Sedang Mengerjakan
+                        </span>
+                      );
+                    } else if (att?.status === 'submitted') {
+                      statusBadge = (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-100 text-teal-800 font-bold text-[10px]">
+                          <CheckCircle className="w-3 h-3 text-teal-600" />
+                          Selesai Terkumpul
+                        </span>
+                      );
+                    } else if (att?.status === 'disqualified') {
+                      statusBadge = (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black text-[10px]">
+                          <XCircle className="w-3 h-3 text-rose-600" />
+                          Didiskualifikasi (Kecurangan)
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <tr key={std.nim} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3.5 font-mono font-bold text-slate-800">{std.nim}</td>
+                        <td className="px-4 py-3.5 font-semibold text-slate-900">{std.name}</td>
+                        <td className="px-4 py-3.5 text-slate-600">{std.program}</td>
+                        <td className="px-4 py-3.5">{statusBadge}</td>
+                        <td className="px-4 py-3.5 font-mono text-slate-500">
+                          {att?.startedAt ? formatIndonesianTime(att.startedAt) : '-'}
+                        </td>
+                        <td className="px-4 py-3.5 font-mono font-bold text-slate-800">
+                          {att?.score !== undefined ? `${att.score} (${att.percentage}%)` : '-'}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">
+                          {att?.violationCount && att.violationCount > 0 ? (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] border border-amber-300">
+                              {att.violationCount}x Keluar Tab
+                            </span>
+                          ) : (
+                            <span className="text-slate-300 text-[11px]">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
         </div>
       )}
 
-      {/* TAB 2: MAHASISWA MANAGEMENT */}
+      {/* ================= TAB 2: MANAJEMEN MAHASISWA PER PRODI (Requirement 4) ================= */}
       {activeTab === 'students' && (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-3 flex-1">
-              <div className="relative min-w-[240px]">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                <input
-                  type="text"
-                  placeholder="Cari Nama atau NIM..."
-                  value={studentSearch}
-                  onChange={(e) => setStudentSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                />
-              </div>
-
-              <select
-                value={filterProdi}
-                onChange={(e) => setFilterProdi(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-800"
+          
+          {/* Structured Prodi Tabs (Requirement 4) */}
+          <div className="flex items-center gap-2 pb-2 overflow-x-auto border-b border-slate-200">
+            {STUDY_PROGRAMS.map(prog => (
+              <button
+                key={prog.slug}
+                onClick={() => setSelectedProdiSlug(prog.slug)}
+                className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  selectedProdiSlug === prog.slug
+                    ? 'bg-teal-700 text-white shadow-sm'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
               >
-                <option value="all">Semua Program Studi</option>
-                {STUDY_PROGRAMS.map(p => (
-                  <option key={p.slug} value={p.slug}>{p.shortName}</option>
-                ))}
-              </select>
+                {prog.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Action Toolbar for current Prodi */}
+          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 font-extrabold text-[10px] uppercase tracking-wider">
+                  Pangkalan Data Terstruktur
+                </span>
+                <span className="text-xs text-slate-500 font-medium">Total Terdaftar: {filteredStudents.length} Mahasiswa</span>
+              </div>
+              <h2 className="text-xl font-black text-slate-900 mt-1">
+                Data Mahasiswa {currentProdi.name}
+              </h2>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Template download */}
+              <button
+                onClick={() => downloadStudentTemplate(selectedProdiSlug, currentProdi.name, 'xlsx')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>Unduh Template (Excel/CSV)</span>
+              </button>
+
+              {/* Bulk upload file input */}
+              <label className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all cursor-pointer shadow-md">
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>{uploadingStudents ? 'Mengunggah...' : 'Upload CSV / XLS / ZIP'}</span>
+                <input
+                  ref={studentFileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls,.zip"
+                  onChange={handleUploadStudentsFile}
+                  disabled={uploadingStudents}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Add single student */}
+              <button
+                onClick={() => {
+                  setNewStudent({
+                    nim: '',
+                    name: '',
+                    email: '',
+                    cohort: '2026',
+                    semester: 1,
+                    courses: PRODI_COURSES_MAP[selectedProdiSlug]?.[1] || []
+                  });
+                  setShowAddStudentModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-teal-700/20"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Tambah Mahasiswa Manual</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Filters Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-slate-200">
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              <input
+                type="text"
+                placeholder="Cari NIM atau Nama..."
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs w-60"
+              />
 
               <select
-                value={filterCohort}
-                onChange={(e) => setFilterCohort(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-mono text-slate-800"
+                value={studentCohortFilter}
+                onChange={(e) => setStudentCohortFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700"
               >
                 <option value="all">Semua Angkatan</option>
                 {COHORTS.map(c => (
                   <option key={c} value={c}>Angkatan {c}</option>
                 ))}
               </select>
-            </div>
 
-            <button
-              onClick={() => setShowAddStudentModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-xs cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Tambah Mahasiswa</span>
-            </button>
+              <select
+                value={studentSemesterFilter}
+                onChange={(e) => setStudentSemesterFilter(e.target.value)}
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-700"
+              >
+                <option value="all">Semua Semester</option>
+                {SEMESTERS.map(s => (
+                  <option key={s} value={s}>Semester {s}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Students Table */}
-          <div className="rounded-3xl bg-white border border-slate-200 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
+          <div className="rounded-3xl bg-white border border-slate-200 p-6 shadow-xs overflow-hidden">
+            <div className="overflow-x-auto rounded-2xl border border-slate-200">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
+                <thead className="bg-slate-100 text-slate-700 uppercase font-bold tracking-wider border-b border-slate-200">
                   <tr>
-                    <th className="px-6 py-4">NIM</th>
-                    <th className="px-6 py-4">Nama Lengkap</th>
-                    <th className="px-6 py-4">Email Kampus</th>
-                    <th className="px-6 py-4">Program Studi</th>
-                    <th className="px-6 py-4">Angkatan</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Aksi</th>
+                    <th className="px-4 py-3.5 w-12 text-center">No</th>
+                    <th className="px-4 py-3.5">NIM</th>
+                    <th className="px-4 py-3.5">Nama Lengkap</th>
+                    <th className="px-4 py-3.5">Angkatan</th>
+                    <th className="px-4 py-3.5">Semester</th>
+                    <th className="px-4 py-3.5">Mata Kuliah Terdaftar</th>
+                    <th className="px-4 py-3.5 text-center">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-800">
-                  {filteredStudents.map((st) => (
-                    <tr key={st.nim} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-mono font-bold">{st.nim}</td>
-                      <td className="px-6 py-4 font-semibold">{st.name}</td>
-                      <td className="px-6 py-4 text-slate-500">{st.email}</td>
-                      <td className="px-6 py-4">
-                        <span className="px-2.5 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200 text-[11px] font-semibold">
-                          {st.program}
+                <tbody className="divide-y divide-slate-200">
+                  {filteredStudents.map((std, idx) => (
+                    <tr key={std.nim} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3.5 text-center font-mono text-slate-400">{idx + 1}</td>
+                      <td className="px-4 py-3.5 font-mono font-bold text-slate-900">{std.nim}</td>
+                      <td className="px-4 py-3.5">
+                        <p className="font-bold text-slate-900">{std.name}</p>
+                        <span className="text-[10px] text-slate-500 font-mono">{std.email}</span>
+                      </td>
+                      <td className="px-4 py-3.5 font-semibold text-slate-700">{std.cohort}</td>
+                      <td className="px-4 py-3.5 font-bold text-teal-800">
+                        <span className="px-2 py-0.5 rounded-md bg-teal-50 border border-teal-200">
+                          Semester {std.semester || 1}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-mono">{st.cohort}</td>
-                      <td className="px-6 py-4">
-                        {st.active ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold text-[11px]">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Aktif
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-slate-400 font-semibold text-[11px]">
-                            <XCircle className="w-3.5 h-3.5" />
-                            Nonaktif
-                          </span>
-                        )}
+                      <td className="px-4 py-3.5 max-w-xs">
+                        <p className="text-[11px] text-slate-600 truncate">
+                          {(std.courses || PRODI_COURSES_MAP[selectedProdiSlug]?.[std.semester || 1] || []).join(', ')}
+                        </p>
                       </td>
-                      <td className="px-6 py-4 text-right space-x-2">
+                      <td className="px-4 py-3.5 text-center">
                         <button
-                          onClick={() => toggleStudentActive(st.nim)}
-                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 text-[11px] cursor-pointer"
-                        >
-                          {st.active ? 'Nonaktifkan' : 'Aktifkan'}
-                        </button>
-                        <button
-                          onClick={() => deleteStudent(st.nim)}
-                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
+                          onClick={() => handleDeleteStudent(std.nim, std.name)}
+                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                           title="Hapus Mahasiswa"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -520,285 +844,587 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                       </td>
                     </tr>
                   ))}
+
+                  {filteredStudents.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                        Belum ada data mahasiswa untuk filter yang dipilih.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
+
         </div>
       )}
 
-      {/* TAB 3: JADWAL UJIAN */}
+      {/* ================= TAB 3: BANK SOAL & JADWAL PUBLISH (Requirement 3) ================= */}
       {activeTab === 'exams' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900">
-              Daftar Ujian UTS & UAS FEB UPNVJ
-            </h3>
-            <span className="text-xs text-slate-500">
-              Total {exams.length} Ujian Terdaftar
-            </span>
+          
+          {/* Exam Selector & Auto-Publish Scheduler Card */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-100 mb-6">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-extrabold text-[10px] uppercase tracking-wider">
+                  Pengaturan Publish Otomatis
+                </span>
+                <h2 className="text-xl font-black text-slate-900 mt-1">
+                  Jadwal Ujian & Publikasi Soal
+                </h2>
+              </div>
+
+              {/* Select Exam to Manage */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-bold text-slate-600">Pilih Ujian:</span>
+                <select
+                  value={selectedExamId}
+                  onChange={(e) => setSelectedExamId(e.target.value)}
+                  className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white font-bold text-slate-900 text-xs"
+                >
+                  {exams.map(e => (
+                    <option key={e.id} value={e.id}>{e.title}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Scheduler Form (Requirement 3: Atur Tanggal hingga Jam Publish Otomatis) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Tanggal Publish Otomatis:</label>
+                <input
+                  type="date"
+                  value={schedPublishDate}
+                  onChange={(e) => setSchedPublishDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Jam Publish Otomatis (WIB):</label>
+                <input
+                  type="time"
+                  value={schedPublishTime}
+                  onChange={(e) => setSchedPublishTime(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1.5">Durasi Pengerjaan (Menit):</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={schedDuration}
+                    onChange={(e) => setSchedDuration(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs"
+                  />
+                  <button
+                    onClick={handleSaveExamSchedule}
+                    className="px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs whitespace-nowrap cursor-pointer transition-colors shadow-sm"
+                  >
+                    Simpan Jadwal
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Status Display */}
+            {activeExam && (
+              <div className="mt-4 p-3.5 rounded-2xl bg-teal-50 border border-teal-200 text-xs text-teal-900 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-teal-700" />
+                  <span>Jadwal Terjadwal: <b>{schedPublishDate || 'Hari ini'}</b> pukul <b>{schedPublishTime} WIB</b> ({schedDuration} Menit).</span>
+                </div>
+                <span className="font-bold text-emerald-700 bg-white px-2.5 py-0.5 rounded-md border border-teal-200 text-[10px]">
+                  Siap Terpublikasi Otomatis
+                </span>
+              </div>
+            )}
+
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {exams.map((ex) => (
-              <div
-                key={ex.id}
-                className="p-6 rounded-3xl bg-white border border-slate-200 space-y-3 shadow-xs"
+          {/* Question Management Action Header */}
+          <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">
+                Daftar Soal ({examQuestions.length} Butir Soal)
+              </h3>
+              <p className="text-xs text-slate-500">Mendukung pilihan ganda bergambar, benar/salah, isian singkat, dan esai.</p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Template Download */}
+              <button
+                onClick={() => downloadQuestionTemplate('xlsx')}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"
               >
-                <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-0.5 rounded-md bg-teal-100 text-teal-900 text-xs font-bold font-mono">
-                    {ex.examType} • {ex.courseCode}
-                  </span>
-                  <span className="text-xs text-slate-500 font-mono">
-                    Durasi: {ex.durationMinutes}m
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>Unduh Template Soal</span>
+              </button>
+
+              {/* Bulk Upload Questions (CSV, XLS, ZIP) */}
+              <label className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all cursor-pointer shadow-md">
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>{uploadingQuestions ? 'Mengunggah...' : 'Upload Soal (CSV/XLS/ZIP)'}</span>
+                <input
+                  ref={questionFileInputRef}
+                  type="file"
+                  accept=".csv,.xlsx,.xls,.zip"
+                  onChange={handleUploadQuestionsFile}
+                  disabled={uploadingQuestions}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Add Single Question */}
+              <button
+                onClick={() => setShowAddQuestionModal(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold transition-all cursor-pointer shadow-md shadow-teal-700/20"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Buat Soal Baru</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Questions List */}
+          <div className="space-y-4">
+            {loadingQuestions ? (
+              <div className="py-16 text-center text-slate-400 text-xs">
+                <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-teal-600" />
+                Memuat butir soal...
+              </div>
+            ) : examQuestions.map((q, idx) => (
+              <div key={q.id} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 flex items-center justify-center font-bold">
+                      {idx + 1}
+                    </span>
+                    <span className="font-bold text-slate-700 uppercase text-[10px] px-2 py-0.5 rounded-md bg-slate-100">
+                      {q.type.replace('_', ' ')}
+                    </span>
+                    <span className="text-slate-400 text-[11px]">Bobot: {q.points} Poin</span>
+                  </div>
+
+                  <span className="text-xs font-bold text-emerald-700 font-mono">
+                    Kunci: {Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer}
                   </span>
                 </div>
 
-                <h4 className="text-base font-bold text-slate-900 leading-snug">
-                  {ex.title}
-                </h4>
-                <p className="text-xs text-slate-500">
-                  Mata Kuliah: {ex.courseName} • Dosen: {ex.lecturer}
+                <p className="text-xs sm:text-sm text-slate-800 font-medium leading-relaxed">
+                  {q.question}
                 </p>
 
-                <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 grid grid-cols-2 gap-2">
-                  <div>
-                    <span>Mulai:</span>
-                    <p className="font-mono text-slate-800 font-semibold">{formatIndonesianTime(ex.startAt)}</p>
+                {/* Optional Image */}
+                {q.imageUrl && (
+                  <div className="my-3 max-w-sm rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+                    <img src={q.imageUrl} alt="Lampiran" className="max-h-48 object-contain" />
                   </div>
-                  <div>
-                    <span>Selesai:</span>
-                    <p className="font-mono text-slate-800 font-semibold">{formatIndonesianTime(ex.endAt)}</p>
+                )}
+
+                {/* Options Preview */}
+                {q.options && q.options.length > 0 && (
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-600">
+                    {q.options.map(opt => (
+                      <div key={opt.id} className="p-2 rounded-xl bg-slate-50 border border-slate-200 flex items-center gap-2">
+                        <span className="font-bold text-teal-800 w-5">{opt.id}.</span>
+                        <span>{opt.text}</span>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
+
         </div>
       )}
 
-      {/* TAB 4: HASIL UJIAN & CSV EXPORT */}
-      {activeTab === 'results' && (
+      {/* ================= TAB 4: DEAN PROFILE & DATABASE SYNC ================= */}
+      {activeTab === 'dean' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
-                Rekapitulasi Hasil Ujian Mahasiswa
-              </h3>
-              <p className="text-xs text-slate-500">
-                Data sinkronisasi jawaban dan nilai evaluasi otomatis
-              </p>
+          <div className="p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-xs">
+            <h3 className="text-lg font-black text-slate-900 mb-2">
+              Profil & Sambutan Resmi Dekan FEB
+            </h3>
+            <p className="text-xs text-slate-500 mb-6">Informasi yang tampil pada halaman depan portal CBT.</p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs mb-4">
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Nama Lengkap & Gelar:</label>
+                <input
+                  type="text"
+                  value={dean.name}
+                  onChange={(e) => setDean({ ...dean, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-600 font-bold mb-1">Jabatan Akademik:</label>
+                <input
+                  type="text"
+                  value={dean.title}
+                  onChange={(e) => setDean({ ...dean, title: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="mb-4 text-xs">
+              <label className="block text-slate-600 font-bold mb-1">Teks Sambutan Dekan:</label>
+              <textarea
+                rows={4}
+                value={dean.greeting}
+                onChange={(e) => setDean({ ...dean, greeting: e.target.value })}
+                className="w-full p-3.5 rounded-xl border border-slate-300 bg-white text-xs leading-relaxed"
+              />
             </div>
 
             <button
-              onClick={exportResultsToCSV}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs cursor-pointer"
+              onClick={async () => {
+                const ok = await updateDeanProfile(dean);
+                if (ok) showToast('success', 'Tersimpan', 'Profil Dekan berhasil diperbarui.');
+              }}
+              className="px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs transition-colors cursor-pointer shadow-sm"
             >
-              <Download className="w-4 h-4" />
-              <span>Export ke Format CSV</span>
+              Simpan Perubahan Sambutan
             </button>
           </div>
 
-          <div className="rounded-3xl bg-white border border-slate-200 overflow-hidden shadow-xs">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
-                  <tr>
-                    <th className="px-6 py-4">NIM</th>
-                    <th className="px-6 py-4">Nama Mahasiswa</th>
-                    <th className="px-6 py-4">Prodi / Angkatan</th>
-                    <th className="px-6 py-4">Ujian</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4">Nilai</th>
-                    <th className="px-6 py-4">Waktu Submit</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-800">
-                  {results.map((res) => (
-                    <tr key={res.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-4 font-mono font-bold">{res.nim}</td>
-                      <td className="px-6 py-4 font-semibold">{res.studentName}</td>
-                      <td className="px-6 py-4">{res.programSlug} ({res.cohort})</td>
-                      <td className="px-6 py-4 font-mono text-[11px]">{res.examId}</td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-                          res.status === 'submitted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                        }`}>
-                          {res.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 font-mono font-bold text-teal-700">
-                        {res.score ?? '-'}
-                      </td>
-                      <td className="px-6 py-4 font-mono text-slate-500">
-                        {res.submittedAt ? formatIndonesianTime(res.submittedAt) : 'Sedang Mengerjakan'}
-                      </td>
-                    </tr>
+          {/* Reset / Reseed Database */}
+          <div className="p-6 sm:p-8 rounded-3xl bg-amber-50/80 border border-amber-300 text-xs">
+            <h4 className="text-base font-bold text-amber-950 mb-1">Sinkronisasi & Inisialisasi Database Awal</h4>
+            <p className="text-amber-900 leading-relaxed mb-4">
+              Sinkronkan pangkalan data Firestore dengan data kurikulum dan bank soal awal Fakultas Ekonomi dan Bisnis UPNVJ.
+            </p>
+            <button
+              onClick={async () => {
+                if (window.confirm('Sinkronkan kembali database awal Firestore?')) {
+                  const res = await seedInitialFirestoreData();
+                  if (res.success) {
+                    showToast('success', 'Sinkronisasi Berhasil', res.message);
+                    loadAllData();
+                  }
+                }
+              }}
+              className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md shadow-amber-600/20 cursor-pointer"
+            >
+              Sinkronkan Database Sekarang
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: ADD STUDENT (Requirement 4) ================= */}
+      {showAddStudentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-xl rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-black text-slate-900 mb-1">
+              Tambah Data Mahasiswa Baru ({currentProdi.shortName})
+            </h3>
+            <p className="text-xs text-slate-500 mb-6">
+              Lengkapi data mahasiswa beserta mata kuliah terdaftar pada semester yang dipilih.
+            </p>
+
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nomor Induk Mahasiswa (NIM): *</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: 2310111001"
+                    value={newStudent.nim}
+                    onChange={(e) => setNewStudent({ ...newStudent, nim: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nama Lengkap Mahasiswa: *</label>
+                  <input
+                    type="text"
+                    placeholder="Nama lengkap sesuai KTM"
+                    value={newStudent.name}
+                    onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Tahun Angkatan:</label>
+                  <select
+                    value={newStudent.cohort}
+                    onChange={(e) => setNewStudent({ ...newStudent, cohort: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                  >
+                    {COHORTS.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Pilih Semester (1 - 8):</label>
+                  <select
+                    value={newStudent.semester}
+                    onChange={(e) => setNewStudent({ ...newStudent, semester: Number(e.target.value) })}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white font-bold text-teal-800 text-xs"
+                  >
+                    {SEMESTERS.map(s => (
+                      <option key={s} value={s}>Semester {s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Email Resmi (Opsional):</label>
+                  <input
+                    type="email"
+                    placeholder="auto: nim@mahasiswa..."
+                    value={newStudent.email}
+                    onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Course Selection for that Semester */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-slate-700 font-bold mb-2">
+                  Daftar Mata Kuliah Diambil (Semester {newStudent.semester}):
+                </label>
+                
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {newStudent.courses.map((c, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 text-xs">
+                      <span>{c}</span>
+                      <button
+                        type="button"
+                        onClick={() => setNewStudent({
+                          ...newStudent,
+                          courses: newStudent.courses.filter((_, idx) => idx !== i)
+                        })}
+                        className="text-rose-600 hover:text-rose-800 font-bold"
+                      >
+                        ×
+                      </button>
+                    </span>
                   ))}
-                </tbody>
-              </table>
+                </div>
+
+                {/* Add Custom Course */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Tambah nama mata kuliah lain..."
+                    value={customCourseInput}
+                    onChange={(e) => setCustomCourseInput(e.target.value)}
+                    className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (customCourseInput.trim()) {
+                        setNewStudent({
+                          ...newStudent,
+                          courses: [...newStudent.courses, customCourseInput.trim()]
+                        });
+                        setCustomCourseInput('');
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold text-xs"
+                  >
+                    Tambah MK
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowAddStudentModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveStudent}
+                className="px-6 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-md shadow-teal-700/20"
+              >
+                Simpan Mahasiswa
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* TAB 5: SAMBUTAN DEKAN EDITOR */}
-      {activeTab === 'dean' && (
-        <div className="max-w-2xl rounded-3xl bg-white border border-slate-200 p-8 shadow-xs space-y-5">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">
-              Edit Sambutan Dekan FEB di Firestore
+      {/* ================= MODAL: ADD QUESTION (Requirement 3) ================= */}
+      {showAddQuestionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-black text-slate-900 mb-1">
+              Buat Butir Soal Baru
             </h3>
-            <p className="text-xs text-slate-500 mt-1">
-              Perubahan pada form ini langsung terintegrasi dan tampil di beranda depan portal CBT FEB.
+            <p className="text-xs text-slate-500 mb-6">
+              Mendukung berbagai jenis soal dan penambahan media gambar.
             </p>
-          </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Nama Lengkap Dekan & Gelar
-            </label>
-            <input
-              type="text"
-              value={dean.name}
-              onChange={(e) => setDean({ ...dean, name: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
-            />
-          </div>
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Tipe Soal:</label>
+                  <select
+                    value={newQ.type}
+                    onChange={(e) => setNewQ({ ...newQ, type: e.target.value as any })}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white font-bold text-xs"
+                  >
+                    <option value="multiple_choice">Pilihan Ganda (A - E)</option>
+                    <option value="multiple_choice_image">Pilihan Ganda Bergambar</option>
+                    <option value="true_false">Benar / Salah (True/False)</option>
+                    <option value="short_answer">Jawaban Singkat</option>
+                    <option value="essay">Uraian / Esai Komprehensif</option>
+                  </select>
+                </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Gelar / Jabatan Ringkas
-            </label>
-            <input
-              type="text"
-              value={dean.title}
-              onChange={(e) => setDean({ ...dean, title: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              URL Foto Resmi Dekan
-            </label>
-            <input
-              type="text"
-              value={dean.photoUrl}
-              onChange={(e) => setDean({ ...dean, photoUrl: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-mono text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Pesan Sambutan & Pernyataan Akademik
-            </label>
-            <textarea
-              rows={5}
-              value={dean.greeting}
-              onChange={(e) => setDean({ ...dean, greeting: e.target.value })}
-              className="w-full p-4 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
-            />
-          </div>
-
-          <button
-            onClick={handleSaveDean}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-xs cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            <span>Simpan Perubahan ke Firestore</span>
-          </button>
-        </div>
-      )}
-
-      {/* Modal: Tambah Mahasiswa */}
-      {showAddStudentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-md rounded-3xl bg-white border border-slate-200 p-6 sm:p-8 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900 mb-4">
-              Pendaftaran Mahasiswa CBT FEB
-            </h3>
-
-            <form onSubmit={handleAddStudent} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold mb-1 text-slate-700">Nama Lengkap</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Nama sesuai KRS"
-                  value={newStudent.name}
-                  onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                />
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Bobot Poin Soal:</label>
+                  <input
+                    type="number"
+                    value={newQ.points}
+                    onChange={(e) => setNewQ({ ...newQ, points: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block font-bold mb-1 text-slate-700">NIM (Nomor Induk Mahasiswa)</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: 2310111005"
-                  value={newStudent.nim}
-                  onChange={(e) => setNewStudent({ ...newStudent, nim: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs font-mono text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
+                <label className="block text-slate-700 font-bold mb-1">Teks Pertanyaan Soal: *</label>
+                <textarea
+                  rows={4}
+                  placeholder="Ketikkan naskah soal secara lengkap..."
+                  value={newQ.question}
+                  onChange={(e) => setNewQ({ ...newQ, question: e.target.value })}
+                  className="w-full p-3.5 rounded-xl border border-slate-300 bg-white text-xs leading-relaxed"
                 />
               </div>
 
-              <div>
-                <label className="block font-bold mb-1 text-slate-700">Email Mahasiswa</label>
-                <input
-                  type="email"
-                  required
-                  placeholder="nama@upnvj.ac.id"
-                  value={newStudent.email}
-                  onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
-                />
+              {/* Image attachment (Requirement 3) */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <label className="block text-slate-700 font-bold">
+                  Lampiran Gambar Soal (Opsional):
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleQuestionImageUpload}
+                    className="text-xs file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
+                  />
+                  <span className="text-slate-400">atau</span>
+                  <input
+                    type="text"
+                    placeholder="Tempel URL Gambar..."
+                    value={newQ.imageUrl}
+                    onChange={(e) => setNewQ({ ...newQ, imageUrl: e.target.value })}
+                    className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs"
+                  />
+                </div>
+                {newQ.imageUrl && (
+                  <div className="mt-2 max-w-xs rounded-xl overflow-hidden border border-slate-200">
+                    <img src={newQ.imageUrl} alt="Preview" className="max-h-36 object-contain" />
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="block font-bold mb-1 text-slate-700">Program Studi</label>
-                <select
-                  value={newStudent.programSlug}
-                  onChange={(e) => setNewStudent({ ...newStudent, programSlug: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900"
-                >
-                  {STUDY_PROGRAMS.map(p => (
-                    <option key={p.slug} value={p.slug}>{p.name}</option>
+              {/* Options Form for Multiple Choice */}
+              {(newQ.type === 'multiple_choice' || newQ.type === 'multiple_choice_image') && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <label className="block text-slate-700 font-bold">Pilihan Jawaban (A - E):</label>
+                  {newQ.options?.map((opt, idx) => (
+                    <div key={opt.id} className="flex items-center gap-2">
+                      <span className="w-6 font-bold text-teal-800 text-center">{opt.id}</span>
+                      <input
+                        type="text"
+                        placeholder={`Teks pilihan ${opt.id}...`}
+                        value={opt.text}
+                        onChange={(e) => {
+                          const updated = [...(newQ.options || [])];
+                          updated[idx] = { ...updated[idx], text: e.target.value };
+                          setNewQ({ ...newQ, options: updated });
+                        }}
+                        className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs"
+                      />
+                    </div>
                   ))}
-                </select>
-              </div>
 
-              <div>
-                <label className="block font-bold mb-1 text-slate-700">Angkatan</label>
-                <select
-                  value={newStudent.cohort}
-                  onChange={(e) => setNewStudent({ ...newStudent, cohort: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs font-mono text-slate-900"
-                >
-                  {COHORTS.map(c => (
-                    <option key={c} value={c}>Angkatan {c}</option>
-                  ))}
-                </select>
-              </div>
+                  <div className="mt-2 flex items-center gap-3 pt-2">
+                    <span className="font-bold text-slate-700">Kunci Jawaban Benar:</span>
+                    <select
+                      value={newQ.correctAnswer as string}
+                      onChange={(e) => setNewQ({ ...newQ, correctAnswer: e.target.value })}
+                      className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-emerald-800 bg-white text-xs"
+                    >
+                      {['A', 'B', 'C', 'D', 'E'].map(o => (
+                        <option key={o} value={o}>Pilihan {o}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setShowAddStudentModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold cursor-pointer"
-                >
-                  Simpan Mahasiswa
-                </button>
-              </div>
-            </form>
+              {/* True/False selection */}
+              {newQ.type === 'true_false' && (
+                <div className="flex items-center gap-3 pt-2">
+                  <span className="font-bold text-slate-700">Kunci Jawaban Benar:</span>
+                  <select
+                    value={newQ.correctAnswer as string}
+                    onChange={(e) => setNewQ({ ...newQ, correctAnswer: e.target.value })}
+                    className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-emerald-800 bg-white text-xs"
+                  >
+                    <option value="Benar">Benar</option>
+                    <option value="Salah">Salah</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Short Answer / Essay Rubric */}
+              {(newQ.type === 'short_answer' || newQ.type === 'essay') && (
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Kunci Jawaban / Kata Kunci Penilaian:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: IFRS / Transparansi / Rasio Lancar"
+                    value={newQ.correctAnswer as string}
+                    onChange={(e) => setNewQ({ ...newQ, correctAnswer: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                  />
+                </div>
+              )}
+
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowAddQuestionModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveQuestion}
+                className="px-6 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-md shadow-teal-700/20"
+              >
+                Simpan Soal ke Bank Ujian
+              </button>
+            </div>
           </div>
         </div>
       )}

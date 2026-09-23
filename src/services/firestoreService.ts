@@ -22,9 +22,10 @@ import {
   ExamAttempt, 
   StudentAnswer, 
   Announcement,
-  AdminUser
+  AdminUser,
+  CourseGrade
 } from '../types';
-import { STUDY_PROGRAMS } from '../constants/programs';
+import { STUDY_PROGRAMS, PRODI_COURSES_MAP } from '../constants/programs';
 
 // Default initial Dean Profile
 export const DEFAULT_DEAN_PROFILE: DeanProfile = {
@@ -64,6 +65,8 @@ export const DEFAULT_COURSES: Course[] = [
     code: 'AKT101',
     programSlug: 'cbt-s1-akuntansi',
     lecturer: 'Dr. Sri Wahyuni, M.Si., Ak., CA',
+    semester: 1,
+    sks: 3,
     active: true
   },
   {
@@ -72,6 +75,8 @@ export const DEFAULT_COURSES: Course[] = [
     code: 'AKT304',
     programSlug: 'cbt-s1-akuntansi',
     lecturer: 'Bambang Sudibyo, S.E., M.Akt.',
+    semester: 6,
+    sks: 3,
     active: true
   },
   {
@@ -80,6 +85,8 @@ export const DEFAULT_COURSES: Course[] = [
     code: 'MNJ201',
     programSlug: 'cbt-s1-manajemen',
     lecturer: 'Dra. Nurhayati, M.M.',
+    semester: 3,
+    sks: 3,
     active: true
   },
   {
@@ -88,6 +95,8 @@ export const DEFAULT_COURSES: Course[] = [
     code: 'DPK102',
     programSlug: 'cbt-d3-perbankan-keuangan',
     lecturer: 'Hendra Gunawan, S.E., M.B.A.',
+    semester: 2,
+    sks: 3,
     active: true
   },
   {
@@ -96,6 +105,8 @@ export const DEFAULT_COURSES: Course[] = [
     code: 'PAK201',
     programSlug: 'cbt-d3-akuntansi',
     lecturer: 'Fitri Handayani, S.E., M.Ak.',
+    semester: 3,
+    sks: 3,
     active: true
   },
   {
@@ -104,6 +115,8 @@ export const DEFAULT_COURSES: Course[] = [
     code: 'EKS204',
     programSlug: 'cbt-s1-ekonomi-syariah',
     lecturer: 'Dr. Ahmad Fauzi, M.E.Sy.',
+    semester: 2,
+    sks: 3,
     active: true
   },
   {
@@ -112,6 +125,8 @@ export const DEFAULT_COURSES: Course[] = [
     code: 'EKP302',
     programSlug: 'cbt-s1-ekonomi-pembangunan',
     lecturer: 'Prof. Dr. Ir. Gunawan, M.Sc.',
+    semester: 3,
+    sks: 3,
     active: true
   }
 ];
@@ -124,133 +139,118 @@ export function getDemoQuestionsForExam(examId: string): Question[] {
       examId,
       order: 1,
       type: 'multiple_choice',
-      question: 'Dalam persamaan dasar akuntansi, hubungan yang benar antara aset, liabilitas, dan ekuitas adalah...',
+      question: 'Berdasarkan Kerangka Konseptual Pelaporan Keuangan (KKPK) dan PSAK terkini, karakteristik kualitatif fundamental yang wajib dipenuhi laporan keuangan entitas publik adalah...',
       options: [
-        { id: 'A', text: 'Aset = Liabilitas + Ekuitas' },
-        { id: 'B', text: 'Aset = Liabilitas - Ekuitas' },
-        { id: 'C', text: 'Liabilitas = Aset + Ekuitas' },
-        { id: 'D', text: 'Ekuitas = Aset + Liabilitas' },
-        { id: 'E', text: 'Aset + Liabilitas = Ekuitas' }
+        { id: 'A', text: 'Relevansi (Relevance) dan Representasi Tepat (Faithful Representation)' },
+        { id: 'B', text: 'Keterbandingan (Comparability) dan Ketepatwaktuan (Timeliness)' },
+        { id: 'C', text: 'Materialitas (Materiality) dan Keterpahaman (Understandability)' },
+        { id: 'D', text: 'Konsistensi (Consistency) dan Konservatisme (Conservatism)' },
+        { id: 'E', text: 'Kelangsungan Usaha (Going Concern) dan Basis Akrual (Accrual Basis)' }
       ],
       correctAnswer: 'A',
-      points: 20
+      points: 15,
+      explanation: 'Dua karakteristik kualitatif fundamental laporan keuangan menurut IFRS/PSAK adalah relevansi dan representasi tepat.'
     },
     {
       id: `${examId}-q2`,
       examId,
       order: 2,
       type: 'multiple_choice_image',
-      question: 'Perhatikan diagram alur siklus akuntansi dan tata kelola keuangan berikut. Tahapan yang tepat setelah penyusunan Neraca Saldo Sebelum Penyesuaian adalah...',
-      imageUrl: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=800',
+      question: 'Perhatikan diagram alur audit investigasi berikut ini. Pada tahapan manakah auditor mulai mengumpulkan bukti forensik digital dan melakukan wawancara mendalam (interogasi terstruktur)?',
+      imageUrl: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=800',
       options: [
-        { id: 'A', text: 'Membuat Jurnal Penutup secara langsung' },
-        { id: 'B', text: 'Penyusunan Ayat Jurnal Penyesuaian (Adjusting Entries)' },
-        { id: 'C', text: 'Penerbitan Laporan Tahunan Pemegang Saham' },
-        { id: 'D', text: 'Pembalikan Jurnal Khusus Kas Masuk' },
-        { id: 'E', text: 'Penyusunan Anggaran Modal Periode Berikutnya' }
+        { id: 'A', text: 'Tahap Penelaahan Informasi Awal (Initial Predication Review)' },
+        { id: 'B', text: 'Tahap Pelaksanaan Pengujian Bukti & Wawancara Mendalam (Evidence Execution)' },
+        { id: 'C', text: 'Tahap Evaluasi Pengendalian Internal Komprehensif' },
+        { id: 'D', text: 'Tahap Finalisasi Laporan Hasil Pemeriksaan (LHP)' },
+        { id: 'E', text: 'Tahap Penyerahan Rekomendasi ke Aparat Penegak Hukum' }
       ],
       correctAnswer: 'B',
-      points: 20
+      points: 15,
+      explanation: 'Pengumpulan bukti forensik dan interogasi saksi/terperiksa dilaksanakan pada fase pelaksanaan pemeriksaan investigatif.'
     },
     {
       id: `${examId}-q3`,
       examId,
       order: 3,
       type: 'true_false',
-      question: 'Berdasarkan standar akuntansi IFRS dan SAK ETAP, aset tetap berwujud harus selalu disusutkan menggunakan metode garis lurus tanpa pengecualian.',
+      question: 'Dalam manajemen perbankan, rasio CAR (Capital Adequacy Ratio) mengukur kecukupan modal minimum yang wajib dipelihara bank guna mengantisipasi risiko kerugian atas aktiva tertimbang menurut risiko (ATMR).',
       options: [
-        { id: 'A', text: 'Benar' },
-        { id: 'B', text: 'Salah' }
+        { id: 'Benar', text: 'Benar' },
+        { id: 'Salah', text: 'Salah' }
       ],
-      correctAnswer: 'Salah',
-      points: 15
+      correctAnswer: 'Benar',
+      points: 10,
+      explanation: 'CAR adalah rasio modal terhadap ATMR yang disyaratkan oleh Bank Indonesia dan OJK untuk menjaga ketahanan sistem perbankan.'
     },
     {
       id: `${examId}-q4`,
       examId,
       order: 4,
-      type: 'multiple_select',
-      question: 'Manakah dari pos-pos berikut yang diklasifikasikan sebagai Aset Lancar (Current Assets) dalam laporan posisi keuangan? (Pilih semua yang benar)',
-      options: [
-        { id: 'A', text: 'Kas dan Setara Kas' },
-        { id: 'B', text: 'Piutang Usaha' },
-        { id: 'C', text: 'Bangunan dan Tanah Pabrik' },
-        { id: 'D', text: 'Persediaan Barang Dagang' },
-        { id: 'E', text: 'Peralatan Kantor Jangka Panjang' }
-      ],
-      correctAnswer: ['A', 'B', 'D'],
-      points: 20
+      type: 'short_answer',
+      question: 'Sebutkan istilah untuk indikator ketimpangan distribusi pendapatan masyarakat dalam ilmu ekonomi pembangunan yang nilainya berkisar antara 0 hingga 1!',
+      correctAnswer: 'Koefisien Gini',
+      points: 15,
+      explanation: 'Rasio / Koefisien Gini merupakan tolok ukur standar ketimpangan distribusi kekayaan atau pendapatan.'
     },
     {
       id: `${examId}-q5`,
       examId,
       order: 5,
-      type: 'short_answer',
-      question: 'Sebutkan istilah dalam akuntansi untuk prinsip yang mengharuskan pencatatan pendapatan dan beban diakui pada periode terjadinya transaksi, bukan saat kas diterima atau dikeluarkan.',
-      options: [],
-      correctAnswer: 'akrual',
-      points: 10
+      type: 'multiple_choice',
+      question: 'Prinsip akad pembiayaan dalam perbankan syariah di mana bank dan nasabah bertindak sebagai mitra usaha dengan pembagian keuntungan berdasarkan nisbah yang disepakati disebut akad...',
+      options: [
+        { id: 'A', text: 'Musyarakah (Penyertaan Modal / Kemitraan)' },
+        { id: 'B', text: 'Murabahah (Jual Beli dengan Margin)' },
+        { id: 'C', text: 'Ijarah Muntahiya Bittamlik (Sewa Beli)' },
+        { id: 'D', text: 'Wadiah Yad Dhamanah (Titipan)' },
+        { id: 'E', text: 'Qardh Hasan (Pinjaman Kebajikan)' }
+      ],
+      correctAnswer: 'A',
+      points: 15,
+      explanation: 'Musyarakah adalah bentuk kemitraan usaha syariah di mana kedua pihak berkontribusi modal dan berbagi laba/rugi.'
     },
     {
       id: `${examId}-q6`,
       examId,
       order: 6,
       type: 'essay',
-      question: 'Jelaskan perbedaan mendasar antara Akuntansi Keuangan (Financial Accounting) dan Akuntansi Manajemen (Managerial Accounting) ditinjau dari pengguna utama informasi, standar pelaporan, dan rentang waktu orientasi!',
-      options: [],
-      correctAnswer: 'Jawaban akan dinilai dosen berdasarkan kriteria: Pengguna Internal vs Eksternal, Kepatuhan SAK/IFRS, dan Prospektif vs Historis.',
-      points: 15
+      question: 'Uraikan secara komprehensif bagaimana implementasi nilai-nilai Bela Negara (Cinta Tanah Air, Sadar Berbangsa dan Bernegara, serta Rela Berkorban) dapat memperkuat integritas seorang profesional ekonomi dan bisnis dalam mencegah praktik tindak pidana korupsi serta kecurangan korporasi!',
+      correctAnswer: 'Rubrik penilaian: Pemahaman konsep Bela Negara, korelasi dengan etika profesi akuntansi/manajemen, penalaran kritis, dan solusi pencegahan korupsi.',
+      points: 30,
+      explanation: 'Nilai Bela Negara menanamkan tanggung jawab moral, kejujuran personal, dan komitmen terhadap kemakmuran bangsa di atas kepentingan pribadi.'
     }
   ];
 }
 
-// Generate realistic default exams
+// Generate default exams with auto-publish time settings
 export function getDefaultExams(): Exam[] {
   const now = new Date();
-  
-  // LIVE exam (today, started 30 mins ago, ends in 90 mins)
-  const liveStart = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-  const liveEnd = new Date(now.getTime() + 90 * 60 * 1000).toISOString();
-
-  // UPCOMING exam (tomorrow)
-  const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-  const upStart = new Date(tomorrow.setHours(8, 0, 0, 0)).toISOString();
-  const upEnd = new Date(tomorrow.setHours(10, 0, 0, 0)).toISOString();
-
-  // FINISHED exam (yesterday)
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const finStart = new Date(yesterday.setHours(8, 0, 0, 0)).toISOString();
-  const finEnd = new Date(yesterday.setHours(10, 0, 0, 0)).toISOString();
+  const todayStr = now.toISOString().split('T')[0];
+  const nextMonth = new Date(now.getTime() + 30 * 24 * 3600000);
+  const nextMonthStr = nextMonth.toISOString().split('T')[0];
 
   const exams: Exam[] = [];
 
-  STUDY_PROGRAMS.forEach((prog, index) => {
-    // 1. Live Exam for this prodi
+  STUDY_PROGRAMS.forEach((prog, idx) => {
+    // 1. Live Active Exam
     exams.push({
-      id: `exam-${prog.id}-uts`,
-      title: `UTS ${prog.shortName}: Teori & Aplikasi Terapan`,
-      courseId: `course-${prog.id}-1`,
-      courseName: index === 0 ? 'Operasional Perbankan Modern' :
-                  index === 1 ? 'Praktikum Perpajakan Terapan' :
-                  index === 2 ? 'Manajemen Keuangan & Bisnis' :
-                  index === 3 ? 'Pengantar Akuntansi I' :
-                  index === 4 ? 'Fiqh Muamalah & Perbankan Syariah' :
-                  'Ekonometrika Terapan & Kebijakan',
-      courseCode: index === 0 ? 'DPK102' :
-                  index === 1 ? 'PAK201' :
-                  index === 2 ? 'MNJ201' :
-                  index === 3 ? 'AKT101' :
-                  index === 4 ? 'EKS204' :
-                  'EKP302',
+      id: `exam-${prog.slug}-uts`,
+      title: `Ujian Tengah Semester (UTS) — ${prog.shortName}`,
+      courseId: `course-${prog.slug}-101`,
+      courseName: idx % 2 === 0 ? 'Kapita Selekta & Praktikum Keuangan' : 'Manajemen Strategis & Analisis Bisnis',
+      courseCode: `FEB-${prog.degree}-${(idx + 1) * 100 + 1}`,
       lecturer: 'Tim Dosen Pengampu FEB UPNVJ',
       programSlug: prog.slug,
       targetPrograms: [prog.slug],
       targetCohorts: ['2023', '2024', '2025', '2026'],
       examType: 'UTS',
-      startAt: liveStart,
-      endAt: liveEnd,
+      startAt: new Date(Date.now() - 3600000).toISOString(),
+      endAt: new Date(Date.now() + 86400000 * 5).toISOString(),
+      publishDate: todayStr,
+      publishTime: '08:00',
       durationMinutes: 90,
-      instructions: '1. Ujian bersifat tutup buku (closed book).\n2. Dilarang membuka tab lain atau menggunakan alat bantu kecerdasan buatan.\n3. Periksa kembali seluruh jawaban sebelum menekan Kumpulkan Ujian.\n4. Sistem melakukan auto-save secara berkala.',
+      instructions: 'Bacalah soal dengan cermat. Dilarang membuka tab lain, menyalin teks, atau meminjamkan akun kepada pihak lain. Sistem dilengkapi pengawas integritas otomatis.',
       showScore: true,
       active: true,
       totalQuestions: 6,
@@ -258,57 +258,36 @@ export function getDefaultExams(): Exam[] {
       updatedAt: now.toISOString()
     });
 
-    // 2. Upcoming Exam for this prodi
+    // 2. Scheduled Exam (Future Auto-Publish)
     exams.push({
-      id: `exam-${prog.id}-uas`,
-      title: `UAS ${prog.shortName}: Tata Kelola & Analisis Strategis`,
-      courseId: `course-${prog.id}-2`,
-      courseName: `Kapita Selekta ${prog.shortName}`,
-      courseCode: `FEB30${index + 1}`,
-      lecturer: 'Koordinator Kurikulum FEB',
+      id: `exam-${prog.slug}-uas`,
+      title: `Ujian Akhir Semester (UAS) — ${prog.shortName}`,
+      courseId: `course-${prog.slug}-201`,
+      courseName: idx % 2 === 0 ? 'Tata Kelola Korporasi & Etika Bisnis' : 'Ekonometrika & Riset Terapan',
+      courseCode: `FEB-${prog.degree}-${(idx + 1) * 100 + 2}`,
+      lecturer: 'Dewan Penguji Akademik FEB',
       programSlug: prog.slug,
       targetPrograms: [prog.slug],
       targetCohorts: ['2023', '2024', '2025', '2026'],
       examType: 'UAS',
-      startAt: upStart,
-      endAt: upEnd,
+      startAt: new Date(Date.now() + 86400000 * 7).toISOString(),
+      endAt: new Date(Date.now() + 86400000 * 14).toISOString(),
+      publishDate: nextMonthStr,
+      publishTime: '09:00',
       durationMinutes: 120,
-      instructions: 'Pastikan perangkat baterai terisi penuh dan gunakan koneksi internet yang stabil.',
-      showScore: false,
+      instructions: 'Ujian Akhir Semester bersifat komprehensif. Pastikan baterai dan koneksi perangkat Anda stabil sebelum memulai ujian.',
+      showScore: true,
       active: true,
       totalQuestions: 6,
       createdAt: now.toISOString(),
       updatedAt: now.toISOString()
-    });
-
-    // 3. Finished Exam for this prodi
-    exams.push({
-      id: `exam-${prog.id}-tryout`,
-      title: `Simulasi Gladi Bersih CBT FEB`,
-      courseId: `course-${prog.id}-0`,
-      courseName: 'Literasi Digital & Etika Bela Negara',
-      courseCode: 'UPN001',
-      lecturer: 'UPT Komputer & FEB UPNVJ',
-      programSlug: prog.slug,
-      targetPrograms: [prog.slug],
-      targetCohorts: ['2023', '2024', '2025', '2026'],
-      examType: 'UTS',
-      startAt: finStart,
-      endAt: finEnd,
-      durationMinutes: 60,
-      instructions: 'Simulasi format soal dan adaptasi antarmuka CBT.',
-      showScore: true,
-      active: true,
-      totalQuestions: 6,
-      createdAt: yesterday.toISOString(),
-      updatedAt: yesterday.toISOString()
     });
   });
 
   return exams;
 }
 
-// Sample initial students registered in the system
+// Default Registered Students per Prodi across Semesters 1 to 8
 export const DEFAULT_STUDENTS: StudentProfile[] = [
   {
     uid: 'demo-student-s1-akt',
@@ -318,66 +297,78 @@ export const DEFAULT_STUDENTS: StudentProfile[] = [
     program: 'S1 Akuntansi',
     programSlug: 'cbt-s1-akuntansi',
     cohort: '2026',
+    semester: 1,
+    courses: PRODI_COURSES_MAP['cbt-s1-akuntansi'][1],
     active: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
   {
     uid: 'demo-student-s1-mnj',
-    email: 'mahasiswa.manajemen@upnvj.ac.id',
+    email: 'siti.rahmawati@upnvj.ac.id',
     name: 'Siti Rahmawati',
     nim: '2410112045',
     program: 'S1 Manajemen',
     programSlug: 'cbt-s1-manajemen',
     cohort: '2025',
+    semester: 3,
+    courses: PRODI_COURSES_MAP['cbt-s1-manajemen'][3],
     active: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
   {
     uid: 'demo-student-d3-dpk',
-    email: 'mahasiswa.perbankan@upnvj.ac.id',
+    email: 'ahmad.faiz@upnvj.ac.id',
     name: 'Ahmad Faiz Fadhlurrahman',
     nim: '2510115012',
     program: 'D3 Perbankan dan Keuangan',
     programSlug: 'cbt-d3-perbankan-keuangan',
     cohort: '2026',
+    semester: 1,
+    courses: PRODI_COURSES_MAP['cbt-d3-perbankan-keuangan'][1],
     active: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
   {
     uid: 'demo-student-d3-akt',
-    email: 'mahasiswa.d3akuntansi@upnvj.ac.id',
+    email: 'dewi.lestari@upnvj.ac.id',
     name: 'Dewi Lestari',
     nim: '2310114022',
     program: 'D3 Akuntansi',
     programSlug: 'cbt-d3-akuntansi',
     cohort: '2024',
+    semester: 4,
+    courses: PRODI_COURSES_MAP['cbt-d3-akuntansi'][4],
     active: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
   {
     uid: 'demo-student-s1-eks',
-    email: 'mahasiswa.syariah@upnvj.ac.id',
+    email: 'ilham.pratama@upnvj.ac.id',
     name: 'Muhammad Ilham Pratama',
     nim: '2410113088',
     program: 'S1 Ekonomi Syariah',
     programSlug: 'cbt-s1-ekonomi-syariah',
     cohort: '2025',
+    semester: 3,
+    courses: PRODI_COURSES_MAP['cbt-s1-ekonomi-syariah'][3],
     active: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
   {
     uid: 'demo-student-s1-ekp',
-    email: 'mahasiswa.pembangunan@upnvj.ac.id',
+    email: 'anisa.maharani@upnvj.ac.id',
     name: 'Anisa Maharani',
     nim: '2310116034',
     program: 'S1 Ekonomi Pembangunan',
     programSlug: 'cbt-s1-ekonomi-pembangunan',
     cohort: '2026',
+    semester: 1,
+    courses: PRODI_COURSES_MAP['cbt-s1-ekonomi-pembangunan'][1],
     active: true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -418,12 +409,12 @@ export async function seedInitialFirestoreData(): Promise<{ success: boolean; me
       }
     }
 
-    // 6. Admin whitelist doc
-    const adminRef = doc(db, 'admins', 'bootstrap-admin');
+    // 6. Admin whitelist doc - Only nadhiframadhan780@gmail.com
+    const adminRef = doc(db, 'admins', 'superadmin-nadhif');
     const adminData: AdminUser = {
-      uid: 'bootstrap-admin',
+      uid: 'superadmin-nadhif',
       email: 'nadhiframadhan780@gmail.com',
-      name: 'Administrator Utama CBT FEB',
+      name: 'Nadhif Ramadhan (Superadmin FEB)',
       role: 'superadmin',
       createdAt: new Date().toISOString()
     };
@@ -483,10 +474,82 @@ export async function getStudentProfile(email: string, nim?: string): Promise<St
       }
     }
 
-    return null;
+    // Fallback search local default students
+    const localMatch = DEFAULT_STUDENTS.find(s => 
+      s.email.toLowerCase() === email.toLowerCase() || (nim && s.nim === nim.trim())
+    );
+    return localMatch || null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, 'students');
-    return null;
+    const localMatch = DEFAULT_STUDENTS.find(s => 
+      s.email.toLowerCase() === email.toLowerCase() || (nim && s.nim === nim.trim())
+    );
+    return localMatch || null;
+  }
+}
+
+// Service: All Students (for Admin)
+export async function getAllStudents(): Promise<StudentProfile[]> {
+  try {
+    const snap = await getDocs(collection(db, 'students'));
+    if (snap.empty) {
+      return DEFAULT_STUDENTS;
+    }
+    const students: StudentProfile[] = [];
+    snap.forEach(d => {
+      students.push({ id: d.id, ...d.data() } as StudentProfile);
+    });
+    return students;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, 'students');
+    return DEFAULT_STUDENTS;
+  }
+}
+
+// Service: Save / Add Student
+export async function saveStudentProfile(student: StudentProfile): Promise<boolean> {
+  try {
+    const studentRef = doc(db, 'students', student.nim);
+    await setDoc(studentRef, {
+      ...student,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `students/${student.nim}`);
+    return false;
+  }
+}
+
+// Service: Bulk Add Students
+export async function saveBulkStudents(students: StudentProfile[]): Promise<number> {
+  let count = 0;
+  try {
+    const batch = writeBatch(db);
+    for (const std of students) {
+      const ref = doc(db, 'students', std.nim);
+      batch.set(ref, {
+        ...std,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      count++;
+    }
+    await batch.commit();
+    return count;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'students_bulk');
+    return count;
+  }
+}
+
+// Service: Delete Student
+export async function deleteStudentProfile(nim: string): Promise<boolean> {
+  try {
+    await deleteDoc(doc(db, 'students', nim));
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `students/${nim}`);
+    return false;
   }
 }
 
@@ -496,17 +559,14 @@ export async function getExamsForStudent(programSlug: string, cohort: string): P
     const examsQuery = query(collection(db, 'exams'), where('active', '==', true));
     const querySnapshot = await getDocs(examsQuery);
     
+    let allExams: Exam[] = [];
     if (querySnapshot.empty) {
-      return getDefaultExams().filter(e => 
-        (e.targetPrograms.length === 0 || e.targetPrograms.includes(programSlug)) &&
-        (e.targetCohorts.length === 0 || e.targetCohorts.includes(cohort))
-      );
+      allExams = getDefaultExams();
+    } else {
+      querySnapshot.forEach(doc => {
+        allExams.push({ id: doc.id, ...doc.data() } as Exam);
+      });
     }
-
-    const allExams: Exam[] = [];
-    querySnapshot.forEach(doc => {
-      allExams.push({ id: doc.id, ...doc.data() } as Exam);
-    });
 
     // Enforce strict access control: student can ONLY see exams matching programSlug and cohort
     return allExams.filter(exam => {
@@ -519,6 +579,38 @@ export async function getExamsForStudent(programSlug: string, cohort: string): P
     return getDefaultExams().filter(e => 
       e.targetPrograms.includes(programSlug) && e.targetCohorts.includes(cohort)
     );
+  }
+}
+
+// Service: All Exams (for Admin)
+export async function getAllExams(): Promise<Exam[]> {
+  try {
+    const snap = await getDocs(collection(db, 'exams'));
+    if (snap.empty) {
+      return getDefaultExams();
+    }
+    const exams: Exam[] = [];
+    snap.forEach(d => {
+      exams.push({ id: d.id, ...d.data() } as Exam);
+    });
+    return exams;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, 'exams');
+    return getDefaultExams();
+  }
+}
+
+// Service: Save / Update Exam
+export async function saveExam(exam: Exam): Promise<boolean> {
+  try {
+    await setDoc(doc(db, 'exams', exam.id), {
+      ...exam,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `exams/${exam.id}`);
+    return false;
   }
 }
 
@@ -538,6 +630,35 @@ export async function getQuestionsForExam(examId: string): Promise<Question[]> {
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'questions');
     return getDemoQuestionsForExam(examId);
+  }
+}
+
+// Service: Save / Update Question
+export async function saveQuestion(question: Question): Promise<boolean> {
+  try {
+    await setDoc(doc(db, 'questions', question.id), question, { merge: true });
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `questions/${question.id}`);
+    return false;
+  }
+}
+
+// Service: Bulk Add Questions
+export async function saveBulkQuestions(questions: Question[]): Promise<number> {
+  let count = 0;
+  try {
+    const batch = writeBatch(db);
+    for (const q of questions) {
+      const ref = doc(db, 'questions', q.id);
+      batch.set(ref, q, { merge: true });
+      count++;
+    }
+    await batch.commit();
+    return count;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'questions_bulk');
+    return count;
   }
 }
 
@@ -561,14 +682,14 @@ export async function getOrCreateExamAttempt(examId: string, student: StudentPro
       programSlug: student.programSlug,
       cohort: student.cohort,
       startedAt: new Date().toISOString(),
-      status: 'in_progress'
+      status: 'in_progress',
+      violationCount: 0
     };
 
     await setDoc(attemptRef, newAttempt);
     return newAttempt;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'examAttempts');
-    // Fallback in-memory attempt
     return {
       id: attemptId,
       examId,
@@ -579,7 +700,8 @@ export async function getOrCreateExamAttempt(examId: string, student: StudentPro
       programSlug: student.programSlug,
       cohort: student.cohort,
       startedAt: new Date().toISOString(),
-      status: 'in_progress'
+      status: 'in_progress',
+      violationCount: 0
     };
   }
 }
@@ -619,55 +741,187 @@ export async function submitExamAttempt(
   attemptId: string, 
   exam: Exam, 
   questions: Question[], 
-  answers: Record<string, StudentAnswer>
+  answers: Record<string, StudentAnswer>,
+  isDisqualified: boolean = false,
+  disqualificationReason?: string
 ): Promise<{ score: number; totalPoints: number; percentage: number }> {
   let score = 0;
   let totalPoints = 0;
 
-  questions.forEach(q => {
-    totalPoints += q.points;
-    const ans = answers[q.id]?.answer;
-    if (!ans) return;
+  if (isDisqualified) {
+    // If disqualified for cheating, score is forced to 0
+    score = 0;
+    questions.forEach(q => totalPoints += q.points);
+  } else {
+    questions.forEach(q => {
+      totalPoints += q.points;
+      const ans = answers[q.id]?.answer;
+      if (!ans) return;
 
-    if (q.type === 'multiple_choice' || q.type === 'multiple_choice_image' || q.type === 'true_false') {
-      if (typeof ans === 'string' && typeof q.correctAnswer === 'string') {
-        if (ans.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
-          score += q.points;
+      if (q.type === 'multiple_choice' || q.type === 'multiple_choice_image' || q.type === 'true_false') {
+        if (typeof ans === 'string' && typeof q.correctAnswer === 'string') {
+          if (ans.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
+            score += q.points;
+          }
         }
-      }
-    } else if (q.type === 'multiple_select') {
-      if (Array.isArray(ans) && Array.isArray(q.correctAnswer)) {
-        const sortedAns = [...ans].sort().join(',');
-        const sortedCorrect = [...q.correctAnswer].sort().join(',');
-        if (sortedAns === sortedCorrect) {
-          score += q.points;
+      } else if (q.type === 'multiple_select') {
+        if (Array.isArray(ans) && Array.isArray(q.correctAnswer)) {
+          const sortedAns = [...ans].sort().join(',');
+          const sortedCorrect = [...q.correctAnswer].sort().join(',');
+          if (sortedAns === sortedCorrect) {
+            score += q.points;
+          }
         }
-      }
-    } else if (q.type === 'short_answer') {
-      if (typeof ans === 'string' && typeof q.correctAnswer === 'string') {
-        if (ans.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
-          score += q.points;
+      } else if (q.type === 'short_answer') {
+        if (typeof ans === 'string' && typeof q.correctAnswer === 'string') {
+          if (ans.trim().toLowerCase() === q.correctAnswer.trim().toLowerCase()) {
+            score += q.points;
+          }
         }
+      } else if (q.type === 'essay') {
+        // Essay gets base points pending lecturer review
+        score += Math.round(q.points * 0.75);
       }
-    } else if (q.type === 'essay') {
-      // Essay gets base points pending lecturer review
-      score += Math.round(q.points * 0.7);
-    }
-  });
+    });
+  }
 
   const percentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0;
 
   try {
     await updateDoc(doc(db, 'examAttempts', attemptId), {
       submittedAt: new Date().toISOString(),
-      status: 'submitted',
+      status: isDisqualified ? 'disqualified' : 'submitted',
       score,
       totalPoints,
-      percentage
+      percentage,
+      disqualificationReason: disqualificationReason || null
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `examAttempts/${attemptId}`);
   }
 
   return { score, totalPoints, percentage };
+}
+
+// Service: Record Proctoring Violation (Tab Switch)
+export async function recordViolation(attemptId: string, violationCount: number): Promise<void> {
+  try {
+    await updateDoc(doc(db, 'examAttempts', attemptId), {
+      violationCount,
+      lastViolationAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.warn('Failed to record violation to Firestore:', error);
+  }
+}
+
+// Service: Live Proctoring / Monitoring Attempts
+export async function getAllAttempts(): Promise<ExamAttempt[]> {
+  try {
+    const snap = await getDocs(collection(db, 'examAttempts'));
+    if (snap.empty) {
+      return [];
+    }
+    const attempts: ExamAttempt[] = [];
+    snap.forEach(d => {
+      attempts.push({ id: d.id, ...d.data() } as ExamAttempt);
+    });
+    return attempts;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, 'examAttempts');
+    return [];
+  }
+}
+
+// Service: Calculate Integrated Grades per Course for Student
+export async function getStudentGrades(
+  studentNim: string, 
+  programSlug: string, 
+  semester: number = 1
+): Promise<{ grades: CourseGrade[]; averageScore: number; gpa: number }> {
+  // Retrieve all attempts for this student
+  let attempts: ExamAttempt[] = [];
+  try {
+    const qAttempt = query(collection(db, 'examAttempts'), where('nim', '==', studentNim));
+    const snap = await getDocs(qAttempt);
+    snap.forEach(d => attempts.push({ id: d.id, ...d.data() } as ExamAttempt));
+  } catch (e) {
+    // Local fallback
+  }
+
+  // Determine courses for this student's prodi and semester
+  const prodiCourses = PRODI_COURSES_MAP[programSlug]?.[semester] || [
+    'Pengantar Akuntansi & Bisnis',
+    'Manajemen Keuangan',
+    'Pendidikan Karakter Bela Negara',
+    'Statistika Terapan'
+  ];
+
+  const grades: CourseGrade[] = prodiCourses.map((cName, idx) => {
+    // Match against completed attempts if available
+    const matchedAttempt = attempts.find(a => 
+      a.status === 'submitted' || a.status === 'disqualified'
+    );
+
+    // Realistic academic grade simulation if not yet fully taken
+    let finalScore = 82;
+    if (matchedAttempt && idx === 0) {
+      finalScore = matchedAttempt.percentage || 0;
+    } else {
+      finalScore = 78 + ((idx * 7) % 18);
+    }
+
+    let letterGrade = 'A';
+    let gradePoint = 4.0;
+
+    if (finalScore >= 85) {
+      letterGrade = 'A';
+      gradePoint = 4.0;
+    } else if (finalScore >= 80) {
+      letterGrade = 'A-';
+      gradePoint = 3.75;
+    } else if (finalScore >= 75) {
+      letterGrade = 'B+';
+      gradePoint = 3.25;
+    } else if (finalScore >= 70) {
+      letterGrade = 'B';
+      gradePoint = 3.0;
+    } else if (finalScore >= 65) {
+      letterGrade = 'B-';
+      gradePoint = 2.75;
+    } else if (finalScore >= 60) {
+      letterGrade = 'C+';
+      gradePoint = 2.25;
+    } else if (finalScore >= 55) {
+      letterGrade = 'C';
+      gradePoint = 2.0;
+    } else if (finalScore >= 40) {
+      letterGrade = 'D';
+      gradePoint = 1.0;
+    } else {
+      letterGrade = 'E';
+      gradePoint = 0.0;
+    }
+
+    return {
+      courseCode: `FEB-${semester}0${idx + 1}`,
+      courseName: cName,
+      sks: 3,
+      utsScore: Math.round(finalScore * 0.95),
+      uasScore: finalScore,
+      assignmentScore: Math.min(100, finalScore + 5),
+      finalScore,
+      letterGrade,
+      gradePoint
+    };
+  });
+
+  const totalScore = grades.reduce((acc, g) => acc + g.finalScore, 0);
+  const averageScore = grades.length > 0 ? Math.round((totalScore / grades.length) * 10) / 10 : 0;
+  
+  const totalGradePoints = grades.reduce((acc, g) => acc + (g.gradePoint * g.sks), 0);
+  const totalSks = grades.reduce((acc, g) => acc + g.sks, 0);
+  const gpa = totalSks > 0 ? Math.round((totalGradePoints / totalSks) * 100) / 100 : 0.0;
+
+  return { grades, averageScore, gpa };
 }

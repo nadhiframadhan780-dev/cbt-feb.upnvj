@@ -89,12 +89,17 @@ export const PreExamModal: React.FC<PreExamModalProps> = ({
             </p>
           </div>
 
-          {/* Security Notice */}
-          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 flex items-start gap-3">
-            <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <p className="text-[11px] text-amber-950 leading-relaxed">
-              Sistem mencatat waktu mulai, aktivitas pengisian, dan waktu penyerahan. Saat timer habis, jawaban Anda akan otomatis dikumpulkan ke server CBT.
-            </p>
+          {/* Security Notice & Mobile Timeout Rule (Requirement 7 & 9) */}
+          <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-amber-950 text-xs">
+              <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span>Peringatan Integritas Ujian & Pengguna HP (Penting!)</span>
+            </div>
+            <ul className="text-[11px] text-amber-900 leading-relaxed list-disc list-inside space-y-1">
+              <li><b>Pengguna Smartphone/HP:</b> Wajib atur waktu mati layar (screen timeout) minimal <b>30 menit</b> untuk menghindari HP mati otomatis yang akan terdeteksi sebagai keluar tab.</li>
+              <li><b>Anti-Cheat Aktif:</b> Dilarang keluar dari tab atau meminimalkan browser. Toleransi keluar tab hanya <b>maksimal 3 kali peringatan</b>. Keluar lebih dari 3 kali akan <b>otomatis didiskualifikasi dengan nilai 0 (NOL)</b>.</li>
+              <li>Fitur salin teks (copy-paste), klik kanan, dan pintasan tangkapan layar dinonaktifkan.</li>
+            </ul>
           </div>
 
           {/* Agreement Checkbox */}

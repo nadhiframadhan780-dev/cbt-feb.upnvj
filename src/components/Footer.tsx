@@ -112,14 +112,23 @@ export const Footer: React.FC<FooterProps> = ({ onNavClick }) => {
 
         </div>
 
-        {/* Bottom Copyright */}
+        {/* Bottom Copyright & Admin portal access */}
         <div className="mt-12 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <p>© 2026 Fakultas Ekonomi dan Bisnis UPN Veteran Jakarta. Hak Cipta Dilindungi.</p>
-          <p className="flex items-center gap-1">
-            <span>Ujian Digital FEB UPNVJ</span>
-            <span className="text-slate-400">•</span>
-            <span>Versi Produksi CBT</span>
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="flex items-center gap-1">
+              <span>Ujian Digital FEB UPNVJ</span>
+              <span className="text-slate-400">•</span>
+              <span>Versi Produksi CBT</span>
+            </p>
+            <button
+              onClick={() => onNavClick('admin-login-prompt')}
+              className="text-[11px] text-slate-400 hover:text-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
+              title="Akses Khusus Administrator nadhiframadhan780@gmail.com"
+            >
+              <span>🔒 Admin FEB</span>
+            </button>
+          </div>
         </div>
 
       </div>
