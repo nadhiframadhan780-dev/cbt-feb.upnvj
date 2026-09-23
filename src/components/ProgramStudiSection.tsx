@@ -12,19 +12,19 @@ export const ProgramStudiSection: React.FC<ProgramStudiSectionProps> = ({ onSele
   const { selectedProgramSlug } = useAuth();
 
   return (
-    <section id="pilih-prodi" className="py-20 relative bg-slate-50/70 dark:bg-slate-950/70 transition-colors">
+    <section id="pilih-prodi" className="py-20 relative bg-slate-50 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Heading */}
         <div className="text-center max-w-3xl mx-auto mb-14">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100/80 dark:bg-amber-950/70 border border-amber-300/60 dark:border-amber-700/50 text-amber-800 dark:text-amber-300 text-xs font-bold uppercase tracking-wider mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold uppercase tracking-wider mb-3">
+            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
             Langkah Awal Ujian
           </div>
-          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             Pilih Program Studi
           </h2>
-          <p className="mt-3 text-base text-slate-600 dark:text-slate-400">
+          <p className="mt-3 text-base text-slate-600">
             Pilih program studi Anda untuk melanjutkan ke autentikasi akun Google resmi dan mengakses ruang ujian CBT FEB UPNVJ.
           </p>
         </div>
@@ -40,13 +40,13 @@ export const ProgramStudiSection: React.FC<ProgramStudiSectionProps> = ({ onSele
                 onClick={() => onSelectProgram(program)}
                 className={`group relative rounded-3xl p-6 sm:p-8 transition-all duration-300 cursor-pointer flex flex-col justify-between ${
                   isSelected
-                    ? 'bg-gradient-to-b from-teal-50/90 to-emerald-50/70 dark:from-teal-950/60 dark:to-slate-900 border-2 border-teal-500 shadow-xl shadow-teal-500/10 -translate-y-1'
-                    : 'bg-white dark:bg-slate-900/90 border border-slate-200/90 dark:border-slate-800/90 hover:border-teal-400 dark:hover:border-teal-600 hover:shadow-lg hover:-translate-y-1'
+                    ? 'bg-gradient-to-b from-teal-50 to-emerald-50 border-2 border-teal-600 shadow-xl shadow-teal-700/10 -translate-y-1'
+                    : 'bg-white border border-slate-200 hover:border-teal-500 hover:shadow-lg hover:-translate-y-1'
                 }`}
               >
                 {/* Selected Indicator Badge */}
                 {isSelected && (
-                  <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-600 text-white text-[11px] font-bold shadow-xs animate-in fade-in duration-200">
+                  <div className="absolute top-4 right-4 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-700 text-white text-[11px] font-bold shadow-xs">
                     <CheckCircle className="w-3.5 h-3.5" />
                     <span>Terpilih</span>
                   </div>
@@ -55,7 +55,7 @@ export const ProgramStudiSection: React.FC<ProgramStudiSectionProps> = ({ onSele
                 <div>
                   {/* Circular/Squircle Program Logo */}
                   <div className="flex items-center gap-4 mb-5">
-                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform duration-300 shadow-xs">
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl p-2 bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden group-hover:scale-105 transition-transform duration-300 shadow-xs">
                       <img
                         src={program.logoUrl}
                         alt={`Logo ${program.name}`}
@@ -65,33 +65,33 @@ export const ProgramStudiSection: React.FC<ProgramStudiSectionProps> = ({ onSele
                     </div>
 
                     <div className="flex-1">
-                      <span className="inline-block text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 mb-1 border border-slate-200 dark:border-slate-700">
+                      <span className="inline-block text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 mb-1 border border-slate-200">
                         Jenjang {program.degree}
                       </span>
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-white leading-snug group-hover:text-teal-600 dark:group-hover:text-teal-400 transition-colors">
+                      <h3 className="text-lg font-bold text-slate-900 leading-snug group-hover:text-teal-700 transition-colors">
                         {program.name}
                       </h3>
                     </div>
                   </div>
 
                   {/* Program Brief Description */}
-                  <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-6">
+                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed mb-6">
                     {program.description}
                   </p>
                 </div>
 
                 {/* Bottom CTA Button */}
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                  <span className="text-xs font-mono text-slate-400 dark:text-slate-500">
+                <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs font-mono text-slate-400">
                     {program.pageUrl}
                   </span>
 
                   <button
                     type="button"
-                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                       isSelected
-                        ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 group-hover:bg-teal-600 group-hover:text-white'
+                        ? 'bg-teal-700 text-white shadow-md shadow-teal-700/30'
+                        : 'bg-slate-100 text-slate-800 group-hover:bg-teal-700 group-hover:text-white'
                     }`}
                   >
                     <span>{isSelected ? 'Lanjut ke CBT' : 'Pilih Prodi'}</span>

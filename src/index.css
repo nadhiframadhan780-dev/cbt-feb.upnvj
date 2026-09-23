@@ -2,22 +2,35 @@
 
 @layer base {
   :root {
-    --color-upn-teal: #0d9488;
-    --color-upn-teal-dark: #0f766e;
+    --color-upn-teal: #0f766e;
+    --color-upn-teal-light: #14b8a6;
+    --color-upn-teal-dark: #115e59;
     --color-upn-yellow: #f59e0b;
     --color-upn-gold: #d97706;
     --color-upn-navy: #0f172a;
+    color-scheme: light;
+  }
+
+  html {
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  body {
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
 }
 
-/* Custom scrollbars for question navigation & admin tables */
+/* Custom scrollbars for clean light UI */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f5f9;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -25,31 +38,27 @@
   border-radius: 9999px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-}
-
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 
-/* Glassmorphism helpers */
+/* Clean, crisp bright glass panels */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: #ffffff;
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03);
 }
 
-.dark .glass-panel {
-  background: rgba(15, 23, 42, 0.85);
+.glass-panel-translucent {
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
 }
 
 /* Animations */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-8px); }
+  50% { transform: translateY(-6px); }
 }
 
 .animate-float-slow {

@@ -10,6 +10,7 @@ import { StudentDashboard } from './components/StudentDashboard';
 import { PreExamModal } from './components/PreExamModal';
 import { ExamRoom } from './components/ExamRoom';
 import { ExamFinished } from './components/ExamFinished';
+import { PeraturanKetentuanPage } from './components/PeraturanKetentuanPage';
 import { PanduanPage } from './components/PanduanPage';
 import { BantuanPage } from './components/BantuanPage';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -17,12 +18,12 @@ import { Footer } from './components/Footer';
 import { STUDY_PROGRAMS } from './constants/programs';
 import { Exam, StudyProgram } from './types';
 import { testFirestoreConnection } from './lib/firebase';
-import { ShieldAlert, Sparkles, GraduationCap } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 const MainApp: React.FC = () => {
-  const { student, selectedProgramSlug, setSelectedProgramSlug, setDemoAdmin, isAdmin } = useAuth();
+  const { student, selectedProgramSlug, setSelectedProgramSlug, setDemoAdmin } = useAuth();
   
-  // Views: 'home' | 'cbt-dashboard' | 'exam-room' | 'exam-finished' | 'panduan' | 'bantuan' | 'admin'
+  // Views: 'home' | 'cbt-dashboard' | 'exam-room' | 'exam-finished' | 'peraturan' | 'panduan' | 'bantuan' | 'admin'
   const [currentView, setCurrentView] = useState<string>('home');
   const [loginModalOpen, setLoginModalOpen] = useState<boolean>(false);
   const [activeExam, setActiveExam] = useState<Exam | null>(null);
@@ -44,6 +45,9 @@ const MainApp: React.FC = () => {
       }
     } else if (currentView === 'exam-room' && activeExam) {
       document.title = `Ujian: ${activeExam.title} — CBT FEB UPNVJ`;
+    } else if (currentView === 'peraturan') {
+      window.location.hash = 'peraturan-ketentuan';
+      document.title = 'Peraturan & Ketentuan Ujian — CBT FEB UPNVJ';
     } else {
       window.location.hash = '';
       document.title = 'CBT FEB UPN Veteran Jakarta';
@@ -90,7 +94,7 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 transition-colors">
       
       {/* Navbar (Hidden only during live full-focus Exam Room) */}
       {currentView !== 'exam-room' && (
@@ -101,11 +105,11 @@ const MainApp: React.FC = () => {
         />
       )}
 
-      {/* Floating Evaluator Testing Bar (quick demo switcher) */}
+      {/* Evaluator Testing Bar (quick demo switcher) */}
       {currentView === 'home' && (
-        <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 py-2 px-4">
+        <div className="bg-amber-50 border-b border-amber-200 py-2 px-4 shadow-2xs">
           <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-semibold">
+            <div className="flex items-center gap-2 text-amber-950 font-bold">
               <Sparkles className="w-3.5 h-3.5 text-amber-600" />
               <span>Simulasi Pengujian Instan:</span>
             </div>
@@ -115,7 +119,7 @@ const MainApp: React.FC = () => {
                   setSelectedProgramSlug('cbt-s1-akuntansi');
                   setLoginModalOpen(true);
                 }}
-                className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 font-bold border border-teal-200 dark:border-teal-700 hover:bg-teal-50"
+                className="px-2.5 py-1 rounded-md bg-white text-teal-800 font-bold border border-teal-200 hover:bg-teal-50 cursor-pointer shadow-xs"
               >
                 🎓 Buka CBT S1 Akuntansi
               </button>
@@ -124,16 +128,25 @@ const MainApp: React.FC = () => {
                   setSelectedProgramSlug('cbt-d3-perbankan-keuangan');
                   setLoginModalOpen(true);
                 }}
-                className="px-2.5 py-1 rounded-md bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-300 font-bold border border-teal-200 dark:border-teal-700 hover:bg-teal-50"
+                className="px-2.5 py-1 rounded-md bg-white text-teal-800 font-bold border border-teal-200 hover:bg-teal-50 cursor-pointer shadow-xs"
               >
                 🎓 Buka CBT D3 Perbankan
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentView('peraturan');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="px-2.5 py-1 rounded-md bg-white text-slate-800 font-bold border border-slate-300 hover:bg-slate-50 cursor-pointer shadow-xs"
+              >
+                ⚖️ Buka Peraturan & Ketentuan
               </button>
               <button
                 onClick={() => {
                   setDemoAdmin(true);
                   setCurrentView('admin');
                 }}
-                className="px-2.5 py-1 rounded-md bg-amber-600 text-white font-bold hover:bg-amber-700 shadow-xs"
+                className="px-2.5 py-1 rounded-md bg-amber-600 text-white font-bold hover:bg-amber-700 shadow-xs cursor-pointer"
               >
                 ⚡ Masuk Admin Portal
               </button>
@@ -155,6 +168,10 @@ const MainApp: React.FC = () => {
                 setCurrentView('panduan');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
+              onRulesClick={() => {
+                setCurrentView('peraturan');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
             <SambutanDekan />
             <ProgramStudiSection onSelectProgram={handleSelectProgram} />
@@ -166,6 +183,10 @@ const MainApp: React.FC = () => {
           <StudentDashboard
             onBackToHome={() => setCurrentView('home')}
             onStartExam={handleStartExam}
+            onGoToRules={() => {
+              setCurrentView('peraturan');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
@@ -188,9 +209,9 @@ const MainApp: React.FC = () => {
           />
         )}
 
-        {/* 5. Panduan Ujian */}
-        {currentView === 'panduan' && (
-          <PanduanPage
+        {/* 5. Peraturan & Ketentuan Ujian */}
+        {currentView === 'peraturan' && (
+          <PeraturanKetentuanPage
             onBack={() => setCurrentView('home')}
             onGoToExam={() => {
               setCurrentView('home');
@@ -201,12 +222,35 @@ const MainApp: React.FC = () => {
           />
         )}
 
-        {/* 6. Bantuan & FAQ */}
-        {currentView === 'bantuan' && (
-          <BantuanPage onBack={() => setCurrentView('home')} />
+        {/* 6. Panduan Ujian */}
+        {currentView === 'panduan' && (
+          <PanduanPage
+            onBack={() => setCurrentView('home')}
+            onGoToExam={() => {
+              setCurrentView('home');
+              setTimeout(() => {
+                document.getElementById('pilih-prodi')?.scrollIntoView({ behavior: 'smooth' });
+              }, 100);
+            }}
+            onGoToRules={() => {
+              setCurrentView('peraturan');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
         )}
 
-        {/* 7. Admin Panel */}
+        {/* 7. Bantuan & FAQ */}
+        {currentView === 'bantuan' && (
+          <BantuanPage 
+            onBack={() => setCurrentView('home')} 
+            onGoToRules={() => {
+              setCurrentView('peraturan');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        )}
+
+        {/* 8. Admin Panel */}
         {currentView === 'admin' && (
           <AdminDashboard onBackToHome={() => setCurrentView('home')} />
         )}

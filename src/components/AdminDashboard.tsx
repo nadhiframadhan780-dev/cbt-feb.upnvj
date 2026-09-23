@@ -4,7 +4,6 @@ import {
   StudentProfile, 
   Course, 
   Exam, 
-  Question, 
   DeanProfile,
   ExamAttempt 
 } from '../types';
@@ -17,24 +16,19 @@ import {
   getDeanProfile,
   updateDeanProfile
 } from '../services/firestoreService';
-import { STUDY_PROGRAMS, COHORTS, UPNVJ_LOGO } from '../constants/programs';
-import { formatIndonesianDate, formatIndonesianTime } from '../utils/formatters';
+import { STUDY_PROGRAMS, COHORTS } from '../constants/programs';
+import { formatIndonesianTime } from '../utils/formatters';
 import { 
   Users, 
   Calendar, 
-  BookOpen, 
-  HelpCircle, 
   Award, 
-  Settings, 
   Download, 
   Plus, 
   Trash2, 
-  Edit3, 
   CheckCircle, 
   XCircle, 
   Search, 
   Database, 
-  ShieldAlert, 
   ArrowLeft,
   Sparkles,
   Save,
@@ -47,13 +41,13 @@ interface AdminDashboardProps {
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) => {
-  const { adminUser, isAdmin, setDemoAdmin } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'exams' | 'questions' | 'results' | 'dean' | 'settings'>('overview');
+  const { adminUser, isAdmin } = useAuth();
+  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'exams' | 'results' | 'dean'>('overview');
 
   // Local state for admin management
   const [students, setStudents] = useState<StudentProfile[]>(DEFAULT_STUDENTS);
-  const [courses, setCourses] = useState<Course[]>(DEFAULT_COURSES);
-  const [exams, setExams] = useState<Exam[]>(getDefaultExams());
+  const [courses] = useState<Course[]>(DEFAULT_COURSES);
+  const [exams] = useState<Exam[]>(getDefaultExams());
   const [dean, setDean] = useState<DeanProfile>(DEFAULT_DEAN_PROFILE);
   const [results, setResults] = useState<ExamAttempt[]>([]);
   
@@ -83,7 +77,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
       const p = await getDeanProfile();
       setDean(p);
 
-      // Generate realistic demo exam submissions for results table
+      // Sample results
       const sampleResults: ExamAttempt[] = [
         {
           id: 'att-101',
@@ -249,32 +243,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
       
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xl border border-slate-700 dark:border-slate-300 text-xs font-semibold flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
+        <div className="fixed bottom-6 right-6 z-50 p-4 rounded-2xl bg-slate-900 text-white shadow-2xl border border-slate-700 text-xs font-semibold flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
           <Sparkles className="w-4 h-4 text-amber-400" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Top Admin Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800 mb-8">
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-200 mb-8">
         <div className="flex items-center gap-3.5">
           <button
             onClick={onBackToHome}
-            className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50"
+            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer shadow-xs"
             title="Kembali ke Beranda"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900">
                 Admin Portal CBT FEB UPNVJ
               </h1>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300">
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
                 Superadmin
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500">
               Pengelolaan Mahasiswa, Jadwal Ujian, Butir Soal, dan Laporan Hasil Akademik
             </p>
           </div>
@@ -285,22 +279,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
           <button
             disabled={loadingSeed}
             onClick={handleSeedDatabase}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-50 dark:bg-teal-950/70 border border-teal-300 dark:border-teal-700 text-teal-800 dark:text-teal-300 font-bold text-xs hover:bg-teal-100 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-50 border border-teal-300 text-teal-800 font-bold text-xs hover:bg-teal-100 transition-colors cursor-pointer"
           >
-            <Database className="w-4 h-4 text-teal-600" />
+            <Database className="w-4 h-4 text-teal-700" />
             <span>{loadingSeed ? 'Menyinkronkan...' : 'Sinkronkan / Inisialisasi Firestore'}</span>
           </button>
         </div>
       </div>
 
       {/* Admin Tab Navigation Bar */}
-      <div className="flex items-center space-x-2 overflow-x-auto pb-3 mb-8 border-b border-slate-200 dark:border-slate-800">
+      <div className="flex items-center space-x-2 overflow-x-auto pb-3 mb-8 border-b border-slate-200">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
             activeTab === 'overview'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           <BarChart3 className="w-4 h-4" />
@@ -309,10 +303,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
         <button
           onClick={() => setActiveTab('students')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
             activeTab === 'students'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -321,10 +315,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
         <button
           onClick={() => setActiveTab('exams')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
             activeTab === 'exams'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           <Calendar className="w-4 h-4" />
@@ -333,10 +327,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
         <button
           onClick={() => setActiveTab('results')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
             activeTab === 'results'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           <FileSpreadsheet className="w-4 h-4" />
@@ -345,10 +339,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
         <button
           onClick={() => setActiveTab('dean')}
-          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 ${
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
             activeTab === 'dean'
-              ? 'bg-teal-600 text-white shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           <Award className="w-4 h-4" />
@@ -360,58 +354,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
       {activeTab === 'overview' && (
         <div className="space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-6 rounded-3xl glass-panel border border-slate-200/90 dark:border-slate-800/90 shadow-xs">
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Mahasiswa Terdaftar</span>
-              <p className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono mt-2">{students.length}</p>
-              <span className="text-[11px] text-teal-600 dark:text-teal-400 mt-1 block">6 Program Studi Aktif</span>
+              <p className="text-3xl font-extrabold text-slate-900 font-mono mt-2">{students.length}</p>
+              <span className="text-[11px] text-teal-700 mt-1 block">6 Program Studi Aktif</span>
             </div>
 
-            <div className="p-6 rounded-3xl glass-panel border border-slate-200/90 dark:border-slate-800/90 shadow-xs">
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Program Studi</span>
-              <p className="text-3xl font-extrabold text-teal-600 dark:text-teal-400 font-mono mt-2">6</p>
+              <p className="text-3xl font-extrabold text-teal-700 font-mono mt-2">6</p>
               <span className="text-[11px] text-slate-500 mt-1 block">2 D3 & 4 S1</span>
             </div>
 
-            <div className="p-6 rounded-3xl glass-panel border border-slate-200/90 dark:border-slate-800/90 shadow-xs">
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sesi Ujian Aktif (LIVE)</span>
-              <p className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 font-mono mt-2">6</p>
-              <span className="text-[11px] text-amber-600 mt-1 block">Tersedia di seluruh prodi</span>
+              <p className="text-3xl font-extrabold text-amber-700 font-mono mt-2">6</p>
+              <span className="text-[11px] text-amber-700 mt-1 block">Tersedia di seluruh prodi</span>
             </div>
 
-            <div className="p-6 rounded-3xl glass-panel border border-slate-200/90 dark:border-slate-800/90 shadow-xs">
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Penyerahan Lembar Jawaban</span>
-              <p className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 font-mono mt-2">{results.length}</p>
-              <span className="text-[11px] text-emerald-600 mt-1 block">Tersimpan di Cloud Firestore</span>
+              <p className="text-3xl font-extrabold text-emerald-700 font-mono mt-2">{results.length}</p>
+              <span className="text-[11px] text-emerald-700 mt-1 block">Tersimpan di Cloud Firestore</span>
             </div>
           </div>
 
           {/* Quick Action Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-6 rounded-3xl glass-panel border border-slate-200 dark:border-slate-800">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
+              <h3 className="text-base font-bold text-slate-900 mb-2">
                 Pusat Kontrol Akses Berbasis Prodi & Angkatan
               </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
-                Sistem secara ketat menerapkan ABAC (Attribute-Based Access Control) di mana mahasiswa D3 Akuntansi hanya dapat mengakses soal D3 Akuntansi, dan S1 Akuntansi hanya melihat soal miliknya.
+              <p className="text-xs text-slate-600 leading-relaxed mb-4">
+                Sistem secara ketat menerapkan isolasi data di mana mahasiswa D3 Akuntansi hanya dapat mengakses ujian D3 Akuntansi, dan S1 Akuntansi hanya melihat soal miliknya.
               </p>
               <button
                 onClick={() => setActiveTab('students')}
-                className="px-4 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold"
+                className="px-4 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold cursor-pointer transition-colors"
               >
                 Kelola Mahasiswa
               </button>
             </div>
 
-            <div className="p-6 rounded-3xl glass-panel border border-slate-200 dark:border-slate-800">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">
+            <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
+              <h3 className="text-base font-bold text-slate-900 mb-2">
                 Ekspor Laporan Nilai UTS & UAS
               </h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+              <p className="text-xs text-slate-600 leading-relaxed mb-4">
                 Unduh seluruh data nilai, waktu pengerjaan, dan status submit mahasiswa dalam format berkas CSV siap olah untuk SIMAK UPNVJ.
               </p>
               <button
                 onClick={exportResultsToCSV}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-xs hover:bg-emerald-700"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
               >
                 <Download className="w-4 h-4" />
                 <span>Unduh Laporan Nilai CSV</span>
@@ -433,14 +427,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                   placeholder="Cari Nama atau NIM..."
                   value={studentSearch}
                   onChange={(e) => setStudentSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-teal-500"
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 />
               </div>
 
               <select
                 value={filterProdi}
                 onChange={(e) => setFilterProdi(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-800"
               >
                 <option value="all">Semua Program Studi</option>
                 {STUDY_PROGRAMS.map(p => (
@@ -451,7 +445,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
               <select
                 value={filterCohort}
                 onChange={(e) => setFilterCohort(e.target.value)}
-                className="px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                className="px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs font-mono text-slate-800"
               >
                 <option value="all">Semua Angkatan</option>
                 {COHORTS.map(c => (
@@ -462,7 +456,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
             <button
               onClick={() => setShowAddStudentModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-xs cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>Tambah Mahasiswa</span>
@@ -470,10 +464,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
           </div>
 
           {/* Students Table */}
-          <div className="rounded-3xl glass-panel border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+          <div className="rounded-3xl bg-white border border-slate-200 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700">
+                <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-6 py-4">NIM</th>
                     <th className="px-6 py-4">Nama Lengkap</th>
@@ -484,21 +478,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                     <th className="px-6 py-4 text-right">Aksi</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-200">
+                <tbody className="divide-y divide-slate-100 text-slate-800">
                   {filteredStudents.map((st) => (
-                    <tr key={st.nim} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr key={st.nim} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 font-mono font-bold">{st.nim}</td>
                       <td className="px-6 py-4 font-semibold">{st.name}</td>
                       <td className="px-6 py-4 text-slate-500">{st.email}</td>
                       <td className="px-6 py-4">
-                        <span className="px-2.5 py-0.5 rounded-md bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-800 text-[11px] font-semibold">
+                        <span className="px-2.5 py-0.5 rounded-md bg-teal-50 text-teal-800 border border-teal-200 text-[11px] font-semibold">
                           {st.program}
                         </span>
                       </td>
                       <td className="px-6 py-4 font-mono">{st.cohort}</td>
                       <td className="px-6 py-4">
                         {st.active ? (
-                          <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold text-[11px]">
+                          <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold text-[11px]">
                             <CheckCircle className="w-3.5 h-3.5" />
                             Aktif
                           </span>
@@ -512,13 +506,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                       <td className="px-6 py-4 text-right space-x-2">
                         <button
                           onClick={() => toggleStudentActive(st.nim)}
-                          className="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 text-[11px]"
+                          className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 text-[11px] cursor-pointer"
                         >
                           {st.active ? 'Nonaktifkan' : 'Aktifkan'}
                         </button>
                         <button
                           onClick={() => deleteStudent(st.nim)}
-                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer"
                           title="Hapus Mahasiswa"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -537,7 +531,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
       {activeTab === 'exams' && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
+            <h3 className="text-base font-bold text-slate-900">
               Daftar Ujian UTS & UAS FEB UPNVJ
             </h3>
             <span className="text-xs text-slate-500">
@@ -549,32 +543,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
             {exams.map((ex) => (
               <div
                 key={ex.id}
-                className="p-6 rounded-3xl glass-panel border border-slate-200 dark:border-slate-800 space-y-3"
+                className="p-6 rounded-3xl bg-white border border-slate-200 space-y-3 shadow-xs"
               >
                 <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-0.5 rounded-md bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 text-xs font-bold font-mono">
+                  <span className="px-2.5 py-0.5 rounded-md bg-teal-100 text-teal-900 text-xs font-bold font-mono">
                     {ex.examType} • {ex.courseCode}
                   </span>
-                  <span className="text-xs text-slate-400 font-mono">
+                  <span className="text-xs text-slate-500 font-mono">
                     Durasi: {ex.durationMinutes}m
                   </span>
                 </div>
 
-                <h4 className="text-base font-bold text-slate-900 dark:text-white leading-snug">
+                <h4 className="text-base font-bold text-slate-900 leading-snug">
                   {ex.title}
                 </h4>
                 <p className="text-xs text-slate-500">
                   Mata Kuliah: {ex.courseName} • Dosen: {ex.lecturer}
                 </p>
 
-                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 grid grid-cols-2 gap-2">
+                <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 grid grid-cols-2 gap-2">
                   <div>
                     <span>Mulai:</span>
-                    <p className="font-mono text-slate-700 dark:text-slate-300 font-semibold">{formatIndonesianTime(ex.startAt)}</p>
+                    <p className="font-mono text-slate-800 font-semibold">{formatIndonesianTime(ex.startAt)}</p>
                   </div>
                   <div>
                     <span>Selesai:</span>
-                    <p className="font-mono text-slate-700 dark:text-slate-300 font-semibold">{formatIndonesianTime(ex.endAt)}</p>
+                    <p className="font-mono text-slate-800 font-semibold">{formatIndonesianTime(ex.endAt)}</p>
                   </div>
                 </div>
               </div>
@@ -588,7 +582,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              <h3 className="text-base font-bold text-slate-900">
                 Rekapitulasi Hasil Ujian Mahasiswa
               </h3>
               <p className="text-xs text-slate-500">
@@ -598,17 +592,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
             <button
               onClick={exportResultsToCSV}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-xs cursor-pointer"
             >
               <Download className="w-4 h-4" />
               <span>Export ke Format CSV</span>
             </button>
           </div>
 
-          <div className="rounded-3xl glass-panel border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+          <div className="rounded-3xl bg-white border border-slate-200 overflow-hidden shadow-xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200 dark:border-slate-700">
+                <thead className="bg-slate-50 text-slate-600 uppercase tracking-wider font-bold border-b border-slate-200">
                   <tr>
                     <th className="px-6 py-4">NIM</th>
                     <th className="px-6 py-4">Nama Mahasiswa</th>
@@ -619,21 +613,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                     <th className="px-6 py-4">Waktu Submit</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-200">
+                <tbody className="divide-y divide-slate-100 text-slate-800">
                   {results.map((res) => (
-                    <tr key={res.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                    <tr key={res.id} className="hover:bg-slate-50">
                       <td className="px-6 py-4 font-mono font-bold">{res.nim}</td>
                       <td className="px-6 py-4 font-semibold">{res.studentName}</td>
                       <td className="px-6 py-4">{res.programSlug} ({res.cohort})</td>
                       <td className="px-6 py-4 font-mono text-[11px]">{res.examId}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
-                          res.status === 'submitted' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-amber-100 text-amber-800'
+                          res.status === 'submitted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
                         }`}>
                           {res.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-mono font-bold text-teal-600 dark:text-teal-400">
+                      <td className="px-6 py-4 font-mono font-bold text-teal-700">
                         {res.score ?? '-'}
                       </td>
                       <td className="px-6 py-4 font-mono text-slate-500">
@@ -650,9 +644,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
       {/* TAB 5: SAMBUTAN DEKAN EDITOR */}
       {activeTab === 'dean' && (
-        <div className="max-w-2xl rounded-3xl glass-panel border border-slate-200 dark:border-slate-800 p-8 shadow-xs space-y-5">
+        <div className="max-w-2xl rounded-3xl bg-white border border-slate-200 p-8 shadow-xs space-y-5">
           <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+            <h3 className="text-lg font-bold text-slate-900">
               Edit Sambutan Dekan FEB di Firestore
             </h3>
             <p className="text-xs text-slate-500 mt-1">
@@ -661,56 +655,56 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-slate-700 mb-1">
               Nama Lengkap Dekan & Gelar
             </label>
             <input
               type="text"
               value={dean.name}
               onChange={(e) => setDean({ ...dean, name: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-teal-500"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-slate-700 mb-1">
               Gelar / Jabatan Ringkas
             </label>
             <input
               type="text"
               value={dean.title}
               onChange={(e) => setDean({ ...dean, title: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-teal-500"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-slate-700 mb-1">
               URL Foto Resmi Dekan
             </label>
             <input
               type="text"
               value={dean.photoUrl}
               onChange={(e) => setDean({ ...dean, photoUrl: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono focus:ring-2 focus:ring-teal-500"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-mono text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+            <label className="block text-xs font-bold text-slate-700 mb-1">
               Pesan Sambutan & Pernyataan Akademik
             </label>
             <textarea
               rows={5}
               value={dean.greeting}
               onChange={(e) => setDean({ ...dean, greeting: e.target.value })}
-              className="w-full p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:ring-2 focus:ring-teal-500"
+              className="w-full p-4 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
             />
           </div>
 
           <button
             onClick={handleSaveDean}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-xs"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-xs cursor-pointer"
           >
             <Save className="w-4 h-4" />
             <span>Simpan Perubahan ke Firestore</span>
@@ -720,55 +714,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
       {/* Modal: Tambah Mahasiswa */}
       {showAddStudentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-2xl">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-white border border-slate-200 p-6 sm:p-8 shadow-2xl">
+            <h3 className="text-lg font-bold text-slate-900 mb-4">
               Pendaftaran Mahasiswa CBT FEB
             </h3>
 
             <form onSubmit={handleAddStudent} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold mb-1">Nama Lengkap</label>
+                <label className="block font-bold mb-1 text-slate-700">Nama Lengkap</label>
                 <input
                   type="text"
                   required
                   placeholder="Nama sesuai KRS"
                   value={newStudent.name}
                   onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1">NIM (Nomor Induk Mahasiswa)</label>
+                <label className="block font-bold mb-1 text-slate-700">NIM (Nomor Induk Mahasiswa)</label>
                 <input
                   type="text"
                   required
                   placeholder="Contoh: 2310111005"
                   value={newStudent.nim}
                   onChange={(e) => setNewStudent({ ...newStudent, nim: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs font-mono text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Email Mahasiswa</label>
+                <label className="block font-bold mb-1 text-slate-700">Email Mahasiswa</label>
                 <input
                   type="email"
                   required
                   placeholder="nama@upnvj.ac.id"
                   value={newStudent.email}
                   onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 focus:ring-2 focus:ring-teal-600 focus:outline-none"
                 />
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Program Studi</label>
+                <label className="block font-bold mb-1 text-slate-700">Program Studi</label>
                 <select
                   value={newStudent.programSlug}
                   onChange={(e) => setNewStudent({ ...newStudent, programSlug: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900"
                 >
                   {STUDY_PROGRAMS.map(p => (
                     <option key={p.slug} value={p.slug}>{p.name}</option>
@@ -777,11 +771,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
               </div>
 
               <div>
-                <label className="block font-bold mb-1">Angkatan</label>
+                <label className="block font-bold mb-1 text-slate-700">Angkatan</label>
                 <select
                   value={newStudent.cohort}
                   onChange={(e) => setNewStudent({ ...newStudent, cohort: e.target.value })}
-                  className="w-full px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-mono"
+                  className="w-full px-4 py-2 rounded-xl border border-slate-300 bg-white text-xs font-mono text-slate-900"
                 >
                   {COHORTS.map(c => (
                     <option key={c} value={c}>Angkatan {c}</option>
@@ -789,17 +783,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                 </select>
               </div>
 
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddStudentModal(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold"
+                  className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold"
+                  className="flex-1 py-2.5 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold cursor-pointer"
                 >
                   Simpan Mahasiswa
                 </button>
