@@ -119,6 +119,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Standard student Google Sign-In
   const loginWithGoogle = async (): Promise<boolean> => {
     try {
+      if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+        setError('Otorisasi Google tidak diaktifkan pada domain Vercel. Silakan gunakan Nama, NIM, dan Angkatan di formulir utama.');
+        return false;
+      }
       setLoading(true);
       setError(null);
       const result = await signInWithPopup(auth, googleProvider);
@@ -162,6 +166,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // EXCLUSIVE ADMIN GOOGLE SIGN-IN (Only nadhiframadhan780@gmail.com)
   const loginAdminWithGoogle = async (): Promise<{ success: boolean; message: string }> => {
     try {
+      if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+        return {
+          success: false,
+          message: 'Google Sign-In tidak didukung pada domain Vercel. Silakan gunakan tab Kode Master Vercel (febupnvj2026).'
+        };
+      }
       setLoading(true);
       setError(null);
       const result = await signInWithPopup(auth, googleProvider);
