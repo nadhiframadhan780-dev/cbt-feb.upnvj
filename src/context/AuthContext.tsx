@@ -21,6 +21,7 @@ interface AuthContextType {
   setSelectedProgramSlug: (slug: string | null) => void;
   loginWithGoogle: () => Promise<boolean>;
   loginAdminWithGoogle: () => Promise<{ success: boolean; message: string }>;
+  loginAdminWithPasscode: (email: string, passcode: string) => Promise<{ success: boolean; message: string }>;
   logout: () => Promise<void>;
   validateStudentData: (nama: string, nim: string, cohort: string) => Promise<boolean>;
   setDemoStudent: (student: StudentProfile) => void;
@@ -52,6 +53,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.removeItem('cbt_selected_program');
     }
   }, [selectedProgramSlug]);
+
+  // Check saved admin session on initial mount
+  useEffect(() => {
+    try {
+      const savedAdminSession = sessionStorage.getItem('cbt_admin_session');
+      if (savedAdminSession) {
+        const parsed = JSON.parse(savedAdminSession);
+        if (parsed?.email?.toLowerCase() === AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+          setIsAdmin(true);
+          setAdminUser(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to parse admin session:', e);
+    }
+  }, []);
 
   // Firebase auth state observer
   useEffect(() => {
@@ -128,6 +145,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Google Sign-In Error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
         setError('Proses login Google dibatalkan.');
+      } else if (err.code === 'auth/unauthorized-domain') {
+        setError(
+          `Domain (${window.location.hostname}) belum didaftarkan di Firebase. Silakan buka Firebase Console -> Authentication -> Settings -> Authorized Domains, lalu tambahkan '${window.location.hostname}'.`
+        );
       } else if (err.code === 'auth/network-request-failed') {
         setError('Koneksi internet bermasalah saat menghubungi server autentikasi.');
       } else {
@@ -179,8 +200,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (err.code === 'auth/popup-closed-by-user') {
         return { success: false, message: 'Proses login Google dibatalkan oleh pengguna.' };
       }
+      if (err.code === 'auth/unauthorized-domain') {
+        return { 
+          success: false, 
+          message: `Domain Vercel (${window.location.hostname}) belum diizinkan di Firebase! Anda dapat menggunakan opsi 'Kode Master Darurat' di bawah untuk langsung masuk.` 
+        };
+      }
       return { success: false, message: 'Gagal autentikasi Google: ' + (err.message || 'Coba lagi.') };
     }
+  };
+
+  // BACKUP / DIRECT ADMIN PASSCODE AUTHENTICATION (Bypasses third-party OAuth domain issues on Vercel)
+  const loginAdminWithPasscode = async (emailInput: string, passcodeInput: string): Promise<{ success: boolean; message: string }> => {
+    const cleanEmail = emailInput.trim().toLowerCase();
+    const cleanPass = passcodeInput.trim().toLowerCase();
+
+    if (cleanEmail !== AUTHORIZED_ADMIN_EMAIL.toLowerCase()) {
+      return {
+        success: false,
+        message: `AKSES DITOLAK! Hanya email resmi administrator (${AUTHORIZED_ADMIN_EMAIL}) yang dapat mengakses panel ini.`
+      };
+    }
+
+    const validPasscodes = ['febupnvj2026', 'nadhif2026', 'cbtfeb2026', 'adminfeb2026'];
+    if (!validPasscodes.includes(cleanPass)) {
+      return {
+        success: false,
+        message: 'Kode Keamanan Master salah! Silakan periksa kembali kata sandi master Anda.'
+      };
+    }
+
+    const session: AdminUser = {
+      uid: 'master-admin-nadhif',
+      email: AUTHORIZED_ADMIN_EMAIL,
+      name: 'Nadhif Ramadhan (Administrator Utama)',
+      role: 'superadmin',
+      createdAt: new Date().toISOString()
+    };
+
+    sessionStorage.setItem('cbt_admin_session', JSON.stringify(session));
+    setIsAdmin(true);
+    setAdminUser(session);
+
+    return {
+      success: true,
+      message: 'Otorisasi Berhasil! Selamat datang Administrator Utama FEB UPNVJ.'
+    };
   };
 
   // Completely clean logout - Prevents lingering / stuck session (Requirement 10)
@@ -301,6 +366,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setSelectedProgramSlug,
         loginWithGoogle,
         loginAdminWithGoogle,
+        loginAdminWithPasscode,
         logout,
         validateStudentData,
         setDemoStudent,
