@@ -59,6 +59,41 @@ const MainApp: React.FC = () => {
     }
   }, [currentView, selectedProgramSlug, activeExam]);
 
+  // Secret admin route trigger via URL hash, search query, or keyboard shortcut (Ctrl+Shift+A)
+  useEffect(() => {
+    const checkSecretAdminAccess = () => {
+      const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      if (hash.includes('admin') || search.includes('admin')) {
+        if (isAdmin && adminUser?.email.toLowerCase().trim() === 'nadhiframadhan780@gmail.com') {
+          setCurrentView('admin');
+        } else {
+          setAdminLoginModalOpen(true);
+        }
+      }
+    };
+
+    checkSecretAdminAccess();
+    window.addEventListener('hashchange', checkSecretAdminAccess);
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        if (isAdmin && adminUser?.email.toLowerCase().trim() === 'nadhiframadhan780@gmail.com') {
+          setCurrentView('admin');
+        } else {
+          setAdminLoginModalOpen(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('hashchange', checkSecretAdminAccess);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAdmin, adminUser]);
+
   // Handle study program selection from landing page
   const handleSelectProgram = (program: StudyProgram) => {
     setSelectedProgramSlug(program.slug);
@@ -223,12 +258,25 @@ const MainApp: React.FC = () => {
         )}
 
         {/* 4. Exam Finished Celebration & Auto Logout option */}
-        {currentView === 'exam-finished' && activeExam && student && examResult && (
+        {currentView === 'exam-finished' && activeExam && examResult && (
           <ExamFinished
             exam={activeExam}
             student={student}
             result={examResult}
-            onBackToDashboard={() => setCurrentView('cbt-dashboard')}
+            onBackToDashboard={() => {
+              if (student) {
+                setCurrentView('cbt-dashboard');
+              } else {
+                setCurrentView('home');
+              }
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onLogoutAndExit={() => {
+              setActiveExam(null);
+              setExamResult(null);
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
           />
         )}
 
@@ -281,7 +329,10 @@ const MainApp: React.FC = () => {
 
       {/* Footer (Hidden during live exam) */}
       {currentView !== 'exam-room' && (
-        <Footer onNavClick={handleNavigateView} />
+        <Footer 
+          onNavClick={handleNavigateView} 
+          onSecretAdminTrigger={() => handleNavigateView('admin-login-prompt')}
+        />
       )}
 
       {/* Student Login & Verification Modal */}

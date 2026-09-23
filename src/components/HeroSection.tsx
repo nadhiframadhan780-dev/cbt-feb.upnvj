@@ -1,4 +1,5 @@
 import React from 'react';
+import { FEB_LOGO } from '../constants/programs';
 import { 
   Play, 
   FileText, 
@@ -33,6 +34,18 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         {/* Main Hero Header */}
         <div className="text-center max-w-4xl mx-auto">
           
+          {/* Official FEB Heading Logo */}
+          <div className="flex items-center justify-center mb-6">
+            <div className="inline-flex items-center p-3 px-6 rounded-3xl bg-white/95 border border-slate-200/90 shadow-sm backdrop-blur-xs hover:shadow-md transition-all">
+              <img 
+                src={FEB_LOGO} 
+                alt="Fakultas Ekonomi dan Bisnis UPN Veteran Jakarta" 
+                className="h-12 sm:h-16 w-auto max-w-[280px] sm:max-w-[420px] object-contain"
+                loading="eager" 
+              />
+            </div>
+          </div>
+
           {/* Tagline Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-teal-200 shadow-xs mb-8">
             <span className="w-2 h-2 rounded-full bg-teal-600 animate-pulse" />

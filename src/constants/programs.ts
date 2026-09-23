@@ -1,6 +1,7 @@
 import { StudyProgram } from '../types';
 
 export const UPNVJ_LOGO = 'https://www.upnvj.ac.id/id/files/thumb/89f8a80e388ced3704b091e21f510755/520';
+export const FEB_LOGO = 'https://feb.upnvj.ac.id/wp-content/uploads/2021/07/logo-feb.png';
 
 export const STUDY_PROGRAMS: StudyProgram[] = [
   {

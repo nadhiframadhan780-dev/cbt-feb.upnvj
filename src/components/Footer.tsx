@@ -1,12 +1,36 @@
-import React from 'react';
-import { UPNVJ_LOGO } from '../constants/programs';
+import React, { useState } from 'react';
+import { UPNVJ_LOGO, FEB_LOGO } from '../constants/programs';
 import { ShieldCheck, Scale, MapPin, Phone, Mail } from 'lucide-react';
 
 interface FooterProps {
   onNavClick: (view: string) => void;
+  onSecretAdminTrigger?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onNavClick }) => {
+export const Footer: React.FC<FooterProps> = ({ onNavClick, onSecretAdminTrigger }) => {
+  const [clickCount, setClickCount] = useState(0);
+  const [lastClickTime, setLastClickTime] = useState(0);
+
+  const handleSecretTrigger = () => {
+    const now = Date.now();
+    if (now - lastClickTime < 1200) {
+      const nextCount = clickCount + 1;
+      if (nextCount >= 3) {
+        setClickCount(0);
+        if (onSecretAdminTrigger) {
+          onSecretAdminTrigger();
+        } else {
+          onNavClick('admin-login-prompt');
+        }
+      } else {
+        setClickCount(nextCount);
+      }
+    } else {
+      setClickCount(1);
+    }
+    setLastClickTime(now);
+  };
+
   return (
     <footer className="border-t border-slate-200 bg-white transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
@@ -16,16 +40,12 @@ export const Footer: React.FC<FooterProps> = ({ onNavClick }) => {
           {/* Identity & Mission (Col 1-2) */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl p-1 bg-white border border-teal-200 flex items-center justify-center shadow-xs">
-                <img src={UPNVJ_LOGO} alt="UPNVJ" className="w-full h-full object-contain" />
-              </div>
-              <div>
-                <h3 className="text-base font-extrabold text-slate-900">
-                  CBT FEB UPN Veteran Jakarta
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Fakultas Ekonomi dan Bisnis
-                </p>
+              <div className="h-12 flex items-center">
+                <img 
+                  src={FEB_LOGO} 
+                  alt="Fakultas Ekonomi dan Bisnis UPN Veteran Jakarta" 
+                  className="h-11 w-auto object-contain" 
+                />
               </div>
             </div>
 
@@ -112,22 +132,21 @@ export const Footer: React.FC<FooterProps> = ({ onNavClick }) => {
 
         </div>
 
-        {/* Bottom Copyright & Admin portal access */}
+        {/* Bottom Copyright & Discreet info */}
         <div className="mt-12 pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>© 2026 Fakultas Ekonomi dan Bisnis UPN Veteran Jakarta. Hak Cipta Dilindungi.</p>
+          <p 
+            onClick={handleSecretTrigger} 
+            className="select-none cursor-default"
+            title="Fakultas Ekonomi dan Bisnis UPN Veteran Jakarta"
+          >
+            © 2026 Fakultas Ekonomi dan Bisnis UPN Veteran Jakarta. Hak Cipta Dilindungi.
+          </p>
           <div className="flex items-center gap-4">
-            <p className="flex items-center gap-1">
+            <p className="flex items-center gap-1.5">
               <span>Ujian Digital FEB UPNVJ</span>
               <span className="text-slate-400">•</span>
-              <span>Versi Produksi CBT</span>
+              <span>Sistem Ujian Terakreditasi</span>
             </p>
-            <button
-              onClick={() => onNavClick('admin-login-prompt')}
-              className="text-[11px] text-slate-400 hover:text-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
-              title="Akses Khusus Administrator nadhiframadhan780@gmail.com"
-            >
-              <span>🔒 Admin FEB</span>
-            </button>
           </div>
         </div>
 

@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Global default-deny catch-all
+    // 1. Global default-deny catch-all
     match /{document=**} {
       allow read, write: if false;
     }
@@ -12,104 +12,156 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Strict bootstrapped admin authorization for nadhiframadhan780@gmail.com
     function isBootstrappedAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'nadhiframadhan780@gmail.com' ||
-        (request.auth.token.email != null && request.auth.token.email.matches('.*@upnvj\\.ac\\.id$'))
-      );
+      return isSignedIn() && 
+        request.auth.token.email != null &&
+        request.auth.token.email.lower() == 'nadhiframadhan780@gmail.com';
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        isBootstrappedAdmin() ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      return isBootstrappedAdmin() || (
+        isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-\\.]+$');
     }
 
-    // Admins collection
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // 2. Admins Collection
+    // Whitelist and role registry
     match /admins/{adminId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
 
-    // Dean Profile & Announcements
+    // 3. Dean Profile & Sambutan Dekan
+    // Public read for campus community; write restricted to Admin
     match /deanProfile/{docId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
+    // 4. Announcements (Pengumuman Resmi CBT)
+    // Public read for all students and visitors; write restricted to Admin
     match /announcements/{announcementId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Study Programs & Courses
+    // 5. Study Programs (Program Studi FEB UPNVJ)
+    // Public read for academic offerings; write restricted to Admin
     match /programs/{programId} {
       allow read: if true;
       allow write: if isAdmin();
     }
 
+    // 6. Courses (Mata Kuliah Semester 1 - 8)
+    // Public read for curriculum catalog; write restricted to Admin
     match /courses/{courseId} {
-      allow read: if isSignedIn() || true;
+      allow read: if true;
       allow write: if isAdmin();
     }
 
-    // Students Collection
+    // 7. Students Collection (Data Mahasiswa FEB)
+    // Admin has full control (bulk import, edit, delete).
+    // Students can read their own profile by UID or verified email.
     match /students/{studentId} {
-      allow read: if isAdmin() || (
+      allow get: if isAdmin() || (
         isSignedIn() && (
-          resource.data.uid == request.auth.uid || 
-          resource.data.email == request.auth.token.email
+          resource.data.uid == request.auth.uid ||
+          (request.auth.token.email != null && resource.data.email.lower() == request.auth.token.email.lower()) ||
+          studentId == request.auth.uid
         )
       );
-      allow create, update, delete: if isAdmin() || (
-        isSignedIn() && request.resource.data.uid == request.auth.uid
+      allow list: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.uid == request.auth.uid ||
+          (request.auth.token.email != null && resource.data.email.lower() == request.auth.token.email.lower())
+        )
       );
-    }
-
-    // Exams Collection
-    match /exams/{examId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // Questions Collection
-    match /questions/{questionId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    // Exam Attempts Collection
-    match /examAttempts/{attemptId} {
-      allow read: if isAdmin() || (
-        isSignedIn() && resource.data.uid == request.auth.uid
-      );
-      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
-      allow update: if isAdmin() || (
-        isSignedIn() && resource.data.uid == request.auth.uid && (
-          // Student can transition to submitted or update score/status
-          request.resource.data.uid == resource.data.uid
+      allow create, update: if isAdmin() || (
+        isSignedIn() && (
+          incoming().uid == request.auth.uid ||
+          (request.auth.token.email != null && incoming().email.lower() == request.auth.token.email.lower())
         )
       );
       allow delete: if isAdmin();
     }
 
-    // Answers Collection
+    // 8. Exams Collection (Jadwal & Konfigurasi Ujian UTS / UAS)
+    // Public read to see scheduled active exams; write restricted to Admin
+    match /exams/{examId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 9. Questions Collection (Bank Soal CBT)
+    // Students can read questions during active exam; write strictly restricted to Admin
+    match /questions/{questionId} {
+      allow read: if isSignedIn() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // 10. Exam Attempts Collection (Sesi Pengerjaan & Nilai Ujian)
+    // Students can record their own attempt and submit their score; Admin monitors all
+    match /examAttempts/{attemptId} {
+      allow get: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.uid == request.auth.uid ||
+          (request.auth.token.email != null && resource.data.email == request.auth.token.email)
+        )
+      );
+      allow list: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.uid == request.auth.uid ||
+          (request.auth.token.email != null && resource.data.email == request.auth.token.email)
+        )
+      );
+      allow create: if isSignedIn() && (
+        incoming().uid == request.auth.uid || isAdmin()
+      );
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        resource.data.uid == request.auth.uid &&
+        incoming().uid == resource.data.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    // 11. Answers Collection (Jawaban Tersimpan Mahasiswa)
+    // Students save/update their own question answers; Admin can review for proctoring
     match /answers/{answerId} {
-      allow read: if isAdmin() || (
-        isSignedIn() && (resource == null || resource.data.studentId == request.auth.uid)
+      allow get: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.studentId == request.auth.uid ||
+          resource.data.uid == request.auth.uid
+        )
+      );
+      allow list: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.studentId == request.auth.uid ||
+          resource.data.uid == request.auth.uid
+        )
       );
       allow create, update: if isSignedIn() && (
-        request.resource.data.studentId == request.auth.uid
+        incoming().studentId == request.auth.uid ||
+        incoming().uid == request.auth.uid ||
+        isAdmin()
       );
       allow delete: if isAdmin();
     }
 
-    // Settings
+    // 12. Settings Collection (Konfigurasi Sistem CBT)
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();

@@ -152,6 +152,17 @@
         "createdAt": { "type": "string" }
       },
       "required": ["uid", "email", "role"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Global CBT system configuration and metadata",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string", "maxLength": 100 },
+        "value": { "type": "string", "maxLength": 2000 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["key"]
     }
   },
   "firestore": {
@@ -194,6 +205,10 @@
     "/admins/{adminId}": {
       "schema": "Admin",
       "description": "Authorized administrator whitelist"
+    },
+    "/settings/{settingId}": {
+      "schema": "Setting",
+      "description": "System settings and feature flags"
     }
   }
 }

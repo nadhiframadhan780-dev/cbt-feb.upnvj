@@ -19,7 +19,8 @@ import {
   Sparkles,
   BarChart2,
   Check,
-  AlertCircle
+  AlertCircle,
+  LogOut
 } from 'lucide-react';
 
 interface StudentDashboardProps {
@@ -33,9 +34,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   onStartExam,
   onGoToRules
 }) => {
-  const { student, selectedProgramSlug, user } = useAuth();
+  const { student, selectedProgramSlug, user, logout } = useAuth();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   
   // Navigation Tabs: 'exams' | 'profile' | 'grades'
   const [mainTab, setMainTab] = useState<'exams' | 'profile' | 'grades'>('exams');
@@ -153,6 +155,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <span>Peraturan & Ketentuan</span>
             </button>
           )}
+
+          <button
+            onClick={() => setLogoutModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 transition-colors shadow-xs cursor-pointer"
+            title="Keluar dari sesi akun CBT"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-600" />
+            <span>Keluar Sesi</span>
+          </button>
         </div>
 
         {/* Main View Mode Selector (Exams, Profile, Grades) */}
@@ -229,6 +240,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               <CheckCircle2 className="w-4 h-4 text-teal-600" /> Terverifikasi CBT FEB
             </span>
           </div>
+
+          <button
+            onClick={() => setLogoutModalOpen(true)}
+            className="p-3 px-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+            title="Keluar dari akun CBT"
+          >
+            <LogOut className="w-4 h-4 text-rose-600" />
+            <span className="hidden sm:inline">Keluar</span>
+          </button>
         </div>
       </div>
 
@@ -641,6 +661,50 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal */}
+      {logoutModalOpen && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl bg-white border border-slate-200 p-6 sm:p-7 shadow-2xl overflow-hidden">
+            <div className="h-1.5 w-full bg-rose-500 absolute top-0 left-0" />
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center flex-shrink-0">
+                <LogOut className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">
+                  Keluar dari Sesi CBT?
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                  Apakah Anda yakin ingin keluar dari akun CBT {student.name}? Anda perlu verifikasi ulang saat ingin masuk ke sistem ujian.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setLogoutModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 font-bold text-xs cursor-pointer transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setLogoutModalOpen(false);
+                  await logout();
+                  onBackToHome();
+                }}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-md shadow-rose-600/20 cursor-pointer transition-all flex items-center gap-1.5"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Ya, Keluar Sekarang</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -16,27 +16,33 @@ import {
 
 interface ExamFinishedProps {
   exam: Exam;
-  student: StudentProfile;
+  student: StudentProfile | null;
   result: {
     score: number;
     totalPoints: number;
     percentage: number;
   };
   onBackToDashboard: () => void;
+  onLogoutAndExit?: () => void;
 }
 
 export const ExamFinished: React.FC<ExamFinishedProps> = ({
   exam,
   student,
   result,
-  onBackToDashboard
+  onBackToDashboard,
+  onLogoutAndExit
 }) => {
   const { logout } = useAuth();
   const isDisqualified = result.score === 0 && result.percentage === 0;
 
   const handleLogoutAndExit = async () => {
     await logout();
-    window.location.reload();
+    if (onLogoutAndExit) {
+      onLogoutAndExit();
+    } else {
+      onBackToDashboard();
+    }
   };
 
   return (
@@ -140,15 +146,15 @@ export const ExamFinished: React.FC<ExamFinishedProps> = ({
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Nama Mahasiswa:</span>
-            <span className="font-bold text-slate-900">{student.name}</span>
+            <span className="font-bold text-slate-900">{student?.name || '-'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">NIM:</span>
-            <span className="font-mono font-bold text-slate-900">{student.nim}</span>
+            <span className="font-mono font-bold text-slate-900">{student?.nim || '-'}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Program Studi:</span>
-            <span className="font-semibold text-slate-800">{student.program}</span>
+            <span className="font-semibold text-slate-800">{student?.program || '-'}</span>
           </div>
           <div className="flex justify-between pt-2 border-t border-slate-200">
             <span className="text-slate-500">Waktu Penyerahan:</span>

@@ -283,11 +283,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
   // Handle Delete Student
   const handleDeleteStudent = async (nim: string, name: string) => {
-    if (!window.confirm(`Hapus data mahasiswa ${name} (${nim}) dari pangkalan data?`)) return;
     const ok = await deleteStudentProfile(nim);
     if (ok) {
       setStudents(prev => prev.filter(s => s.nim !== nim));
-      showToast('success', 'Terhapus', `Data mahasiswa ${name} telah dihapus.`);
+      showToast('success', 'Terhapus', `Data mahasiswa ${name} (${nim}) telah dihapus dari sistem.`);
     }
   };
 
@@ -1105,12 +1104,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
             </p>
             <button
               onClick={async () => {
-                if (window.confirm('Sinkronkan kembali database awal Firestore?')) {
-                  const res = await seedInitialFirestoreData();
-                  if (res.success) {
-                    showToast('success', 'Sinkronisasi Berhasil', res.message);
-                    loadAllData();
-                  }
+                const res = await seedInitialFirestoreData();
+                if (res.success) {
+                  showToast('success', 'Sinkronisasi Berhasil', res.message);
+                  loadAllData();
+                } else {
+                  showToast('info', 'Status Database', res.message);
                 }
               }}
               className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md shadow-amber-600/20 cursor-pointer"
