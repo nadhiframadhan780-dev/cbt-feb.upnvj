@@ -24,7 +24,9 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
 }) => {
   const { loginAdminWithGoogle, loginAdminWithPasscode, loading } = useAuth();
   const { showToast, showModalAlert } = useNotification();
-  const [loginTab, setLoginTab] = useState<'google' | 'passcode'>('google');
+  const [loginTab, setLoginTab] = useState<'google' | 'passcode'>(
+    typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') ? 'passcode' : 'google'
+  );
   const [adminEmail, setAdminEmail] = useState('nadhiframadhan780@gmail.com');
   const [passcode, setPasscode] = useState('');
   const [submitting, setSubmitting] = useState(false);
