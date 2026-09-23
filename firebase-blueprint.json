@@ -1,0 +1,199 @@
+{
+  "entities": {
+    "Student": {
+      "title": "Student",
+      "description": "Mahasiswa profile registered in FEB CBT system",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 255 },
+        "name": { "type": "string", "maxLength": 150 },
+        "nim": { "type": "string", "maxLength": 30 },
+        "program": { "type": "string", "maxLength": 100 },
+        "programSlug": { "type": "string", "maxLength": 80 },
+        "cohort": { "type": "string", "maxLength": 10 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email", "name", "nim", "programSlug", "cohort", "active"]
+    },
+    "StudyProgram": {
+      "title": "StudyProgram",
+      "description": "Fakultas Ekonomi dan Bisnis degree program",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "shortName": { "type": "string", "maxLength": 60 },
+        "degree": { "type": "string", "enum": ["D3", "S1"] },
+        "slug": { "type": "string", "maxLength": 80 },
+        "logoUrl": { "type": "string", "maxLength": 500 },
+        "description": { "type": "string", "maxLength": 500 },
+        "active": { "type": "boolean" }
+      },
+      "required": ["name", "degree", "slug", "active"]
+    },
+    "Course": {
+      "title": "Course",
+      "description": "Mata kuliah FEB",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150 },
+        "code": { "type": "string", "maxLength": 30 },
+        "programSlug": { "type": "string", "maxLength": 80 },
+        "lecturer": { "type": "string", "maxLength": 150 },
+        "active": { "type": "boolean" }
+      },
+      "required": ["name", "code", "programSlug", "active"]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "UTS and UAS examination schedule and metadata",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "courseId": { "type": "string", "maxLength": 64 },
+        "courseName": { "type": "string", "maxLength": 150 },
+        "courseCode": { "type": "string", "maxLength": 30 },
+        "lecturer": { "type": "string", "maxLength": 150 },
+        "programSlug": { "type": "string", "maxLength": 80 },
+        "examType": { "type": "string", "enum": ["UTS", "UAS"] },
+        "startAt": { "type": "string" },
+        "endAt": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "instructions": { "type": "string", "maxLength": 2000 },
+        "showScore": { "type": "boolean" },
+        "active": { "type": "boolean" },
+        "totalQuestions": { "type": "number" }
+      },
+      "required": ["title", "courseName", "programSlug", "examType", "startAt", "endAt", "durationMinutes", "active"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Exam question item",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string", "maxLength": 64 },
+        "order": { "type": "number" },
+        "type": { "type": "string", "enum": ["multiple_choice", "multiple_choice_image", "true_false", "multiple_select", "essay", "short_answer"] },
+        "question": { "type": "string", "maxLength": 3000 },
+        "imageUrl": { "type": "string", "maxLength": 500 },
+        "points": { "type": "number" }
+      },
+      "required": ["examId", "order", "type", "question", "points"]
+    },
+    "ExamAttempt": {
+      "title": "ExamAttempt",
+      "description": "Student test session attempt and submission",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string", "maxLength": 64 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "uid": { "type": "string", "maxLength": 128 },
+        "nim": { "type": "string", "maxLength": 30 },
+        "studentName": { "type": "string", "maxLength": 150 },
+        "programSlug": { "type": "string", "maxLength": 80 },
+        "cohort": { "type": "string", "maxLength": 10 },
+        "startedAt": { "type": "string" },
+        "submittedAt": { "type": "string" },
+        "status": { "type": "string", "enum": ["in_progress", "submitted", "expired"] },
+        "score": { "type": "number" }
+      },
+      "required": ["examId", "studentId", "uid", "nim", "status", "startedAt"]
+    },
+    "Answer": {
+      "title": "Answer",
+      "description": "Student auto-saved answer per question",
+      "type": "object",
+      "properties": {
+        "attemptId": { "type": "string", "maxLength": 128 },
+        "questionId": { "type": "string", "maxLength": 64 },
+        "isFlagged": { "type": "boolean" },
+        "savedAt": { "type": "string" }
+      },
+      "required": ["attemptId", "questionId"]
+    },
+    "DeanProfile": {
+      "title": "DeanProfile",
+      "description": "Dean of FEB UPNVJ academic profile and greeting",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 150 },
+        "title": { "type": "string", "maxLength": 100 },
+        "position": { "type": "string", "maxLength": 150 },
+        "photoUrl": { "type": "string", "maxLength": 500 },
+        "greeting": { "type": "string", "maxLength": 3000 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "position", "greeting"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Academic notices for FEB CBT students",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 200 },
+        "content": { "type": "string", "maxLength": 2000 },
+        "date": { "type": "string", "maxLength": 50 },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"] },
+        "active": { "type": "boolean" }
+      },
+      "required": ["title", "content", "date", "active"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "CBT Administrator account reference",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 255 },
+        "name": { "type": "string", "maxLength": 150 },
+        "role": { "type": "string", "enum": ["admin", "superadmin"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Collection of verified student profiles"
+    },
+    "/programs/{programId}": {
+      "schema": "StudyProgram",
+      "description": "Collection of FEB study programs"
+    },
+    "/courses/{courseId}": {
+      "schema": "Course",
+      "description": "Courses offered per study program"
+    },
+    "/exams/{examId}": {
+      "schema": "Exam",
+      "description": "UTS and UAS exam schedule configurations"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Exam question repository"
+    },
+    "/examAttempts/{attemptId}": {
+      "schema": "ExamAttempt",
+      "description": "Student exam attempts and scores"
+    },
+    "/answers/{answerId}": {
+      "schema": "Answer",
+      "description": "Auto-saved answers per student attempt"
+    },
+    "/deanProfile/current": {
+      "schema": "DeanProfile",
+      "description": "Current Dean welcome message"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "Announcement",
+      "description": "Official CBT announcements"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Authorized administrator whitelist"
+    }
+  }
+}

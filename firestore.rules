@@ -1,0 +1,118 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'nadhiframadhan780@gmail.com' ||
+        (request.auth.token.email != null && request.auth.token.email.matches('.*@upnvj\\.ac\\.id$'))
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isBootstrappedAdmin() ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Admins collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Dean Profile & Announcements
+    match /deanProfile/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Study Programs & Courses
+    match /programs/{programId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /courses/{courseId} {
+      allow read: if isSignedIn() || true;
+      allow write: if isAdmin();
+    }
+
+    // Students Collection
+    match /students/{studentId} {
+      allow read: if isAdmin() || (
+        isSignedIn() && (
+          resource.data.uid == request.auth.uid || 
+          resource.data.email == request.auth.token.email
+        )
+      );
+      allow create, update, delete: if isAdmin() || (
+        isSignedIn() && request.resource.data.uid == request.auth.uid
+      );
+    }
+
+    // Exams Collection
+    match /exams/{examId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Questions Collection
+    match /questions/{questionId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Exam Attempts Collection
+    match /examAttempts/{attemptId} {
+      allow read: if isAdmin() || (
+        isSignedIn() && resource.data.uid == request.auth.uid
+      );
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin() || (
+        isSignedIn() && resource.data.uid == request.auth.uid && (
+          // Student can transition to submitted or update score/status
+          request.resource.data.uid == resource.data.uid
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Answers Collection
+    match /answers/{answerId} {
+      allow read: if isAdmin() || (
+        isSignedIn() && (resource == null || resource.data.studentId == request.auth.uid)
+      );
+      allow create, update: if isSignedIn() && (
+        request.resource.data.studentId == request.auth.uid
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

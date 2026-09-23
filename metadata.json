@@ -1,0 +1,8 @@
+{
+  "name": "CBT FEB UPN Veteran Jakarta",
+  "description": "Platform Computer Based Test UTS dan UAS Fakultas Ekonomi dan Bisnis UPN Veteran Jakarta. Ujian Digital yang Terintegrasi, Aman, dan Efisien.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
