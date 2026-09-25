@@ -70,21 +70,12 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => handleNavClick('home')}
               className="flex items-center gap-2.5 sm:gap-3 cursor-pointer group select-none shrink-0"
             >
-              <div className="flex items-center gap-2 shrink-0">
-                <img 
-                  src={UPNVJ_LOGO} 
-                  alt="Logo UPN Veteran Jakarta" 
-                  className="h-8 sm:h-9 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
-                  loading="eager"
-                />
-                <div className="h-6 w-px bg-slate-200 hidden sm:block" />
-                <img 
-                  src={FEB_LOGO} 
-                  alt="Logo Fakultas Ekonomi dan Bisnis UPNVJ" 
-                  className="h-8 sm:h-9 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
-                  loading="eager"
-                />
-              </div>
+              <img 
+                src={UPNVJ_LOGO} 
+                alt="Logo UPN Veteran Jakarta" 
+                className="h-8 sm:h-9 w-auto object-contain transition-transform duration-200 group-hover:scale-105 shrink-0"
+                loading="eager"
+              />
 
               <div className="flex flex-col text-left shrink-0">
                 <span className="text-sm sm:text-base font-extrabold tracking-tight text-slate-900 leading-tight whitespace-nowrap">
@@ -97,10 +88,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden xl:flex items-center gap-1 font-medium text-xs sm:text-sm text-slate-600 shrink-0">
+            <nav className="hidden xl:flex items-center gap-0.5 sm:gap-1 font-medium text-xs text-slate-600 shrink-0">
               <button
                 onClick={() => handleNavClick('home')}
-                className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
                   currentView === 'home' 
                     ? 'text-teal-800 bg-teal-50 font-bold' 
                     : 'text-slate-600 hover:text-teal-700 hover:bg-slate-100/70'
@@ -120,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }, 100);
                   }
                 }}
-                className="px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-slate-600 hover:text-teal-700 hover:bg-slate-100/70 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-colors text-slate-600 hover:text-teal-700 hover:bg-slate-100/70 cursor-pointer"
               >
                 Tentang
               </button>
@@ -136,7 +127,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }, 100);
                   }
                 }}
-                className="px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors text-slate-600 hover:text-teal-700 hover:bg-slate-100/70 cursor-pointer"
+                className="px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-colors text-slate-600 hover:text-teal-700 hover:bg-slate-100/70 cursor-pointer"
               >
                 Program Studi
               </button>
@@ -144,19 +135,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               {/* Peraturan & Ketentuan */}
               <button
                 onClick={() => handleNavClick('peraturan')}
-                className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors flex items-center gap-1.5 cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-colors flex items-center gap-1 cursor-pointer ${
                   currentView === 'peraturan' 
                     ? 'text-teal-800 bg-teal-50 font-bold' 
                     : 'text-slate-600 hover:text-teal-700 hover:bg-slate-100/70'
                 }`}
+                title="Peraturan & Ketentuan Ujian"
               >
-                <Scale className="w-3.5 h-3.5 text-teal-600 shrink-0" />
                 <span>Peraturan & Ketentuan</span>
               </button>
 
               <button
                 onClick={() => handleNavClick('panduan')}
-                className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
                   currentView === 'panduan' 
                     ? 'text-teal-800 bg-teal-50 font-bold' 
                     : 'text-slate-600 hover:text-teal-700 hover:bg-slate-100/70'
@@ -167,7 +158,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               <button
                 onClick={() => handleNavClick('bantuan')}
-                className={`px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-colors cursor-pointer ${
                   currentView === 'bantuan' 
                     ? 'text-teal-800 bg-teal-50 font-bold' 
                     : 'text-slate-600 hover:text-teal-700 hover:bg-slate-100/70'

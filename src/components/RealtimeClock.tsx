@@ -88,17 +88,16 @@ export const RealtimeClock: React.FC<RealtimeClockProps> = ({
 
   // Default: 'compact' for navbar / header
   return (
-    <div className={`hidden md:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100/80 border border-slate-200/70 text-slate-700 text-xs select-none ${className}`}>
-      <span className="flex h-1.5 w-1.5 relative">
+    <div className={`hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100/90 border border-slate-200/80 text-slate-700 text-xs select-none shrink-0 ${className}`}>
+      <span className="flex h-1.5 w-1.5 relative shrink-0">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
         <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
       </span>
       {showIcon && <Clock className="w-3.5 h-3.5 text-teal-700 shrink-0" />}
-      <span className="text-[11px] font-medium text-slate-600 hidden lg:inline">
-        {dayName}, {dateNum} {monthShort} {year}
+      <span className="text-[11px] font-medium text-slate-600 hidden 2xl:inline whitespace-nowrap">
+        {dayName}, {dateNum} {monthShort} •
       </span>
-      <span className="text-slate-300 hidden lg:inline">•</span>
-      <span className="font-mono font-bold text-[11px] text-teal-900">
+      <span className="font-mono font-bold text-[11px] text-teal-900 whitespace-nowrap">
         {timeString}
       </span>
     </div>

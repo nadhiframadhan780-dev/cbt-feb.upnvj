@@ -160,7 +160,7 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 transition-colors">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 transition-colors w-full overflow-x-hidden relative">
       
       {/* Navbar (Hidden only during live full-focus Exam Room) */}
       {currentView !== 'exam-room' && (
@@ -171,15 +171,15 @@ const MainApp: React.FC = () => {
         />
       )}
 
-      {/* Evaluator Quick Simulation Bar (Student & Academic Guidelines only - No Admin button) */}
-      {currentView === 'home' && (
-        <div className="bg-amber-50 border-b border-amber-200 py-2 px-4 shadow-2xs">
-          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex items-center gap-2 text-amber-950 font-bold">
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+      {/* Evaluator Quick Simulation Bar (Only for Unauthenticated Visitors) */}
+      {currentView === 'home' && !student && (
+        <div className="bg-amber-50/95 border-b border-amber-200/90 py-2 px-4 sm:px-6 lg:px-8 shadow-2xs w-full overflow-hidden">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-amber-950 font-bold shrink-0">
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
               <span>Simulasi Pengujian Peserta Mahasiswa:</span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 onClick={() => {
                   setSelectedProgramSlug('cbt-s1-akuntansi');
