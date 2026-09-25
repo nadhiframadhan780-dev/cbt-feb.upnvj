@@ -487,6 +487,10 @@ export async function getDeanProfile(): Promise<DeanProfile> {
     }
     return DEFAULT_DEAN_PROFILE;
   } catch (error) {
+    if (error instanceof Error && error.message.includes('client is offline')) {
+      console.warn('Firestore client offline saat memuat deanProfile, menggunakan profil default.');
+      return DEFAULT_DEAN_PROFILE;
+    }
     handleFirestoreError(error, OperationType.GET, 'deanProfile/current');
     return DEFAULT_DEAN_PROFILE;
   }

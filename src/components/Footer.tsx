@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UPNVJ_LOGO, FEB_LOGO } from '../constants/programs';
-import { ShieldCheck, Scale, MapPin, Phone, Mail } from 'lucide-react';
+import { ShieldCheck, Scale, MapPin, Phone, Mail, Wifi } from 'lucide-react';
+import { NetworkSpeedTester } from './NetworkSpeedTester';
 
 interface FooterProps {
   onNavClick: (view: string) => void;
@@ -33,8 +34,13 @@ export const Footer: React.FC<FooterProps> = ({ onNavClick, onSecretAdminTrigger
 
   return (
     <footer className="border-t border-slate-200 bg-white transition-colors">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-14">
         
+        {/* Fitur Uji Koneksi Wi-Fi & Internet Mahasiswa CBT */}
+        <div id="uji-koneksi-wifi" className="mb-12">
+          <NetworkSpeedTester />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
           
           {/* Identity & Mission (Col 1-2) */}
@@ -85,6 +91,19 @@ export const Footer: React.FC<FooterProps> = ({ onNavClick, onSecretAdminTrigger
                 <button onClick={() => onNavClick('bantuan')} className="hover:text-teal-700 transition-colors cursor-pointer">
                   Pusat Bantuan & FAQ
                 </button>
+              </li>
+              <li>
+                <a 
+                  href="#uji-koneksi-wifi" 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    document.getElementById('uji-koneksi-wifi')?.scrollIntoView({ behavior: 'smooth' });
+                  }} 
+                  className="hover:text-teal-700 transition-colors font-bold text-teal-800 flex items-center gap-1 cursor-pointer"
+                >
+                  <Wifi className="w-3.5 h-3.5 text-teal-600" />
+                  <span>Uji Koneksi Wi-Fi CBT</span>
+                </a>
               </li>
               <li>
                 <a href="#sambutan-dekan" className="hover:text-teal-700 transition-colors cursor-pointer">

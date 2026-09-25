@@ -1,6 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import appletConfig from '../../firebase-applet-config.json';
 
 export const firebaseConfig = {
@@ -15,9 +15,21 @@ export const firebaseConfig = {
 // Initialize Firebase App
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
-export const db = (appletConfig.firestoreDatabaseId && appletConfig.firestoreDatabaseId !== '(default)' && appletConfig.firestoreDatabaseId !== '')
-  ? getFirestore(app, appletConfig.firestoreDatabaseId)
-  : getFirestore(app);
+
+const customDbId = (appletConfig.firestoreDatabaseId && appletConfig.firestoreDatabaseId !== '(default)' && appletConfig.firestoreDatabaseId !== '')
+  ? appletConfig.firestoreDatabaseId
+  : undefined;
+
+// Robust Firestore Initialization with Long Polling Auto-detection for preview iframes
+export const db = (() => {
+  try {
+    return initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true
+    }, customDbId);
+  } catch {
+    return customDbId ? getFirestore(app, customDbId) : getFirestore(app);
+  }
+})();
 
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -52,8 +64,9 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errorMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -68,7 +81,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   };
-  console.error('Firestore Error:', JSON.stringify(errInfo));
+  if (errorMessage.includes('client is offline')) {
+    console.warn('Firestore Client Offline (using local cache/fallback):', JSON.stringify(errInfo));
+  } else {
+    console.error('Firestore Error:', JSON.stringify(errInfo));
+  }
   return errInfo;
 }
 
