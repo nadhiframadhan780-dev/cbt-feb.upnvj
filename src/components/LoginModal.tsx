@@ -6,15 +6,20 @@ import {
   ShieldAlert, 
   ArrowRight, 
   CheckCircle2, 
-  AlertCircle,
-  Sparkles,
-  UserCheck,
-  LogOut,
-  Mail,
-  User as UserIcon,
-  Hash,
-  Calendar
+  AlertCircle, 
+  Sparkles, 
+  UserCheck, 
+  LogOut, 
+  Mail, 
+  User as UserIcon, 
+  Hash, 
+  Calendar,
+  AlertTriangle,
+  Clock,
+  MessageSquare,
+  ExternalLink
 } from 'lucide-react';
+import { StudentAccountStatus } from '../types';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -43,6 +48,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
   const [googleLoading, setGoogleLoading] = useState(false);
   const [fieldError, setFieldError] = useState<{
     field: 'nama' | 'nim' | 'angkatan' | 'prodi' | 'general' | null;
+    accountStatus?: StudentAccountStatus;
     message: string | null;
   }>({ field: null, message: null });
 
@@ -113,6 +119,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
     } else {
       setFieldError({
         field: result.errorField || 'general',
+        accountStatus: result.accountStatus,
         message: result.message || 'Terjadi kesalahan data. Periksa kembali input Anda.'
       });
     }
@@ -228,8 +235,57 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
                 </button>
               </div>
 
-              {/* Top Level Error Banner */}
-              {(error || fieldError.message) && (
+              {/* Account Status Alert: Temporary Inactive */}
+              {(fieldError.accountStatus === 'temporary_inactive' || error?.includes('NONAKTIF SEMENTARA')) && (
+                <div className="mb-5 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs text-left shadow-sm animate-in fade-in">
+                  <div className="flex items-center gap-2 font-black text-amber-900 text-sm mb-1.5">
+                    <Clock className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                    <span>STATUS AKUN: NONAKTIF SEMENTARA</span>
+                  </div>
+                  <p className="font-bold text-amber-950 leading-relaxed text-xs">
+                    "AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN"
+                  </p>
+                  <p className="text-[11px] text-amber-800 mt-2">
+                    Silakan hubungi pengawas ruang atau admin CBT FEB UPNVJ untuk permohonan pembukaan kembali akun Anda.
+                  </p>
+                </div>
+              )}
+
+              {/* Account Status Alert: Permanent Inactive */}
+              {(fieldError.accountStatus === 'permanent_inactive' || error?.includes('NONAKTIF PERMANEN')) && (
+                <div className="mb-5 p-4 rounded-2xl bg-rose-50 border-2 border-rose-400 text-rose-950 text-xs text-left shadow-sm animate-in fade-in">
+                  <div className="flex items-center gap-2 font-black text-rose-900 text-sm mb-1.5">
+                    <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0" />
+                    <span>STATUS AKUN: NONAKTIF PERMANEN</span>
+                  </div>
+                  <p className="font-bold text-rose-950 leading-relaxed text-xs">
+                    "AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL &quot;VETERAN&quot; JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT"
+                  </p>
+
+                  <div className="mt-4 pt-3 border-t border-rose-200 flex flex-wrap items-center gap-2">
+                    <a
+                      href="https://wa.me/6281290001920?text=Halo%20Admin%20CBT%20FEB%20UPNVJ,%20saya%20ingin%20mengonfirmasi%20status%20akun%20mahasiswa%20saya"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      <span>Hubungi Helpdesk CBT via WhatsApp</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                    <a
+                      href="mailto:cbt.feb@upnvj.ac.id?subject=Konfirmasi%20Status%20Akun%20Mahasiswa%20CBT%20FEB%20UPNVJ"
+                      className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white border border-rose-300 hover:bg-rose-100 text-rose-900 font-bold text-xs transition-colors cursor-pointer"
+                    >
+                      <Mail className="w-4 h-4 text-rose-600" />
+                      <span>Kirim Email Akademik</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Standard Validation Error Banner (Only shown if not accountStatus error) */}
+              {!fieldError.accountStatus && !error?.includes('NONAKTIF') && (error || fieldError.message) && (
                 <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2.5 animate-in fade-in">
                   <ShieldAlert className="w-4 h-4 flex-shrink-0 text-rose-600 mt-0.5" />
                   <div className="space-y-1">

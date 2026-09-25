@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 import { 
   StudentProfile, 
+  StudentAccountStatus,
   Course, 
   Exam, 
   DeanProfile,
@@ -22,10 +23,12 @@ import {
   saveStudentProfile,
   saveBulkStudents,
   deleteStudentProfile,
+  updateStudentAccountStatus,
   getAllExams,
   saveExam,
   getQuestionsForExam,
   saveQuestion,
+  deleteQuestion,
   saveBulkQuestions,
   getAllAttempts
 } from '../services/firestoreService';
@@ -44,6 +47,8 @@ import {
   Download, 
   Plus, 
   Trash2, 
+  Edit3,
+  Pencil,
   CheckCircle, 
   XCircle, 
   Search, 
@@ -63,7 +68,11 @@ import {
   Image as ImageIcon,
   Check,
   Eye,
-  BookOpen
+  BookOpen,
+  UserCheck,
+  UserX,
+  AlertOctagon,
+  X
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -101,11 +110,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
     nim: '',
     name: '',
     email: '',
-    cohort: '2026',
+    cohort: '2023',
     semester: 1,
+    status: 'active' as StudentAccountStatus,
     courses: [] as string[]
   });
   const [customCourseInput, setCustomCourseInput] = useState('');
+
+  // Modal: Edit Student (Requirement: Edit Data & Status Akun)
+  const [showEditStudentModal, setShowEditStudentModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<StudentProfile | null>(null);
+  const [editCustomCourseInput, setEditCustomCourseInput] = useState('');
 
   // Bulk Upload Student
   const studentFileInputRef = useRef<HTMLInputElement>(null);
@@ -118,6 +133,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
 
   // Modal: Add Question
   const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
+
+  // Modal: Edit Question (Requirement: Edit Soal yang Sudah Ada)
+  const [showEditQuestionModal, setShowEditQuestionModal] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [newQ, setNewQ] = useState<Partial<Question>>({
     type: 'multiple_choice',
     question: '',
@@ -274,6 +293,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
         email: '',
         cohort: '2026',
         semester: 1,
+        status: 'active',
         courses: PRODI_COURSES_MAP[selectedProdiSlug]?.[1] || []
       });
     } else {
@@ -287,6 +307,94 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
     if (ok) {
       setStudents(prev => prev.filter(s => s.nim !== nim));
       showToast('success', 'Terhapus', `Data mahasiswa ${name} (${nim}) telah dihapus dari sistem.`);
+    }
+  };
+
+  // Handle Update Student Status (Aktifkan, Nonaktifkan Sementara, Nonaktif Permanen)
+  const handleUpdateStudentAccountStatus = async (
+    nim: string,
+    status: StudentAccountStatus,
+    studentName?: string
+  ) => {
+    let reason: string | undefined;
+    if (status === 'temporary_inactive') {
+      reason = 'AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN';
+    } else if (status === 'permanent_inactive') {
+      reason = 'AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL "VETERAN" JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT';
+    }
+
+    const ok = await updateStudentAccountStatus(nim, status, reason);
+    if (ok) {
+      setStudents(prev => prev.map(s => {
+        if (s.nim === nim) {
+          return {
+            ...s,
+            status,
+            active: status === 'active',
+            statusReason: reason
+          };
+        }
+        return s;
+      }));
+
+      const nameLabel = studentName ? `Mahasiswa ${studentName}` : `NIM ${nim}`;
+      if (status === 'active') {
+        showToast('success', 'Akun Diaktifkan', `${nameLabel} berhasil diaktifkan kembali.`);
+      } else if (status === 'temporary_inactive') {
+        showToast('warning', 'Nonaktif Sementara', `${nameLabel} dinonaktifkan sementara waktu (Tidak hadir hari ujian).`);
+      } else {
+        showToast('error', 'Nonaktif Permanen', `${nameLabel} dinonaktifkan permanen.`);
+      }
+    } else {
+      showToast('error', 'Gagal', 'Terjadi kendala saat memperbarui status akun di Firestore.');
+    }
+  };
+
+  // Open Edit Student Modal
+  const handleOpenEditStudent = (student: StudentProfile) => {
+    setEditingStudent({ 
+      ...student,
+      status: student.status || (student.active ? 'active' : 'temporary_inactive'),
+      courses: student.courses ? [...student.courses] : []
+    });
+    setShowEditStudentModal(true);
+  };
+
+  // Save Edited Student
+  const handleSaveEditedStudent = async () => {
+    if (!editingStudent) return;
+    if (!editingStudent.name.trim() || !editingStudent.nim.trim()) {
+      showToast('error', 'Validasi Gagal', 'Nama Lengkap dan NIM wajib diisi.');
+      return;
+    }
+
+    let statusReason = editingStudent.statusReason;
+    if (editingStudent.status === 'temporary_inactive') {
+      statusReason = 'AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN';
+    } else if (editingStudent.status === 'permanent_inactive') {
+      statusReason = 'AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL "VETERAN" JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT';
+    } else {
+      statusReason = undefined;
+    }
+
+    const updatedProfile: StudentProfile = {
+      ...editingStudent,
+      name: editingStudent.name.trim(),
+      nim: editingStudent.nim.trim(),
+      email: editingStudent.email?.trim() || `${editingStudent.nim.trim()}@mahasiswa.upnvj.ac.id`,
+      active: editingStudent.status === 'active',
+      statusReason,
+      updatedAt: new Date().toISOString()
+    };
+
+    const ok = await saveStudentProfile(updatedProfile);
+    if (ok) {
+      setStudents(prev => prev.map(s => s.nim === updatedProfile.nim ? updatedProfile : s));
+      setShowEditStudentModal(false);
+      setEditingStudent(null);
+      showToast('success', 'Data Mahasiswa Diperbarui', `Perubahan data ${updatedProfile.name} (${updatedProfile.nim}) berhasil disimpan.`);
+    } else {
+      showToast('error', 'Gagal', 'Tidak dapat memperbarui data mahasiswa di Firestore.');
     }
   };
 
@@ -410,6 +518,70 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
     reader.onloadend = () => {
       setNewQ(prev => ({ ...prev, imageUrl: reader.result as string }));
       showToast('info', 'Gambar Terpilih', 'Pratinjau gambar berhasil dimuat.');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Open Edit Question Modal
+  const handleOpenEditQuestion = (q: Question) => {
+    setEditingQuestion({
+      ...q,
+      options: q.options ? q.options.map(o => ({ ...o })) : [
+        { id: 'A', text: '' },
+        { id: 'B', text: '' },
+        { id: 'C', text: '' },
+        { id: 'D', text: '' },
+        { id: 'E', text: '' }
+      ]
+    });
+    setShowEditQuestionModal(true);
+  };
+
+  // Save Edited Question
+  const handleSaveEditedQuestion = async () => {
+    if (!editingQuestion || !editingQuestion.question?.trim()) {
+      showToast('error', 'Validasi Gagal', 'Naskah pertanyaan soal tidak boleh kosong.');
+      return;
+    }
+
+    const updatedQuestion: Question = {
+      ...editingQuestion,
+      question: editingQuestion.question.trim(),
+      points: Number(editingQuestion.points) || 10,
+      imageUrl: editingQuestion.imageUrl?.trim() || undefined
+    };
+
+    const ok = await saveQuestion(updatedQuestion);
+    if (ok) {
+      setExamQuestions(prev => prev.map(q => q.id === updatedQuestion.id ? updatedQuestion : q));
+      setShowEditQuestionModal(false);
+      setEditingQuestion(null);
+      showToast('success', 'Soal Diperbarui', `Butir soal nomor ${updatedQuestion.order} berhasil diperbarui.`);
+    } else {
+      showToast('error', 'Gagal', 'Terjadi kendala saat menyimpan butir soal ke Firestore.');
+    }
+  };
+
+  // Delete Question
+  const handleDeleteQuestion = async (questionId: string) => {
+    const ok = await deleteQuestion(questionId);
+    if (ok) {
+      setExamQuestions(prev => prev.filter(q => q.id !== questionId));
+      showToast('success', 'Soal Dihapus', 'Butir soal telah dihapus dari bank ujian.');
+    } else {
+      showToast('error', 'Gagal', 'Gagal menghapus butir soal dari Firestore.');
+    }
+  };
+
+  // Handle Image Upload for Editing Question
+  const handleEditQuestionImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingQuestion) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEditingQuestion(prev => prev ? ({ ...prev, imageUrl: reader.result as string }) : null);
+      showToast('info', 'Gambar Terpilih', 'Pratinjau gambar soal berhasil dimuat.');
     };
     reader.readAsDataURL(file);
   };
@@ -750,6 +922,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                     email: '',
                     cohort: '2026',
                     semester: 1,
+                    status: 'active',
                     courses: PRODI_COURSES_MAP[selectedProdiSlug]?.[1] || []
                   });
                   setShowAddStudentModal(true);
@@ -803,50 +976,99 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-100 text-slate-700 uppercase font-bold tracking-wider border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3.5 w-12 text-center">No</th>
-                    <th className="px-4 py-3.5">NIM</th>
-                    <th className="px-4 py-3.5">Nama Lengkap</th>
-                    <th className="px-4 py-3.5">Angkatan</th>
-                    <th className="px-4 py-3.5">Semester</th>
-                    <th className="px-4 py-3.5">Mata Kuliah Terdaftar</th>
-                    <th className="px-4 py-3.5 text-center">Aksi</th>
+                    <th className="px-3.5 py-3.5 w-10 text-center">No</th>
+                    <th className="px-3.5 py-3.5">NIM</th>
+                    <th className="px-3.5 py-3.5">Nama Lengkap</th>
+                    <th className="px-3 py-3.5">Angkatan</th>
+                    <th className="px-3 py-3.5">Semester</th>
+                    <th className="px-3.5 py-3.5">Status Akun</th>
+                    <th className="px-3.5 py-3.5">Mata Kuliah Terdaftar</th>
+                    <th className="px-4 py-3.5 text-center">Kelola Status & Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
                   {filteredStudents.map((std, idx) => (
                     <tr key={std.nim} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3.5 text-center font-mono text-slate-400">{idx + 1}</td>
-                      <td className="px-4 py-3.5 font-mono font-bold text-slate-900">{std.nim}</td>
-                      <td className="px-4 py-3.5">
+                      <td className="px-3.5 py-3.5 text-center font-mono text-slate-400">{idx + 1}</td>
+                      <td className="px-3.5 py-3.5 font-mono font-bold text-slate-900">{std.nim}</td>
+                      <td className="px-3.5 py-3.5">
                         <p className="font-bold text-slate-900">{std.name}</p>
                         <span className="text-[10px] text-slate-500 font-mono">{std.email}</span>
                       </td>
-                      <td className="px-4 py-3.5 font-semibold text-slate-700">{std.cohort}</td>
-                      <td className="px-4 py-3.5 font-bold text-teal-800">
+                      <td className="px-3 py-3.5 font-semibold text-slate-700">{std.cohort}</td>
+                      <td className="px-3 py-3.5 font-bold text-teal-800">
                         <span className="px-2 py-0.5 rounded-md bg-teal-50 border border-teal-200">
                           Semester {std.semester || 1}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 max-w-xs">
+                      <td className="px-3.5 py-3.5">
+                        {std.status === 'temporary_inactive' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-[10px] border border-amber-300">
+                            <Clock className="w-3 h-3 text-amber-600" />
+                            Nonaktif Sementara
+                          </span>
+                        ) : std.status === 'permanent_inactive' ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-100 text-rose-900 font-extrabold text-[10px] border border-rose-300">
+                            <AlertOctagon className="w-3 h-3 text-rose-600" />
+                            Nonaktif Permanen
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 font-extrabold text-[10px] border border-emerald-300">
+                            <CheckCircle className="w-3 h-3 text-emerald-600" />
+                            Akun Aktif
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3.5 py-3.5 max-w-xs">
                         <p className="text-[11px] text-slate-600 truncate">
                           {(std.courses || PRODI_COURSES_MAP[selectedProdiSlug]?.[std.semester || 1] || []).join(', ')}
                         </p>
                       </td>
                       <td className="px-4 py-3.5 text-center">
-                        <button
-                          onClick={() => handleDeleteStudent(std.nim, std.name)}
-                          className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                          title="Hapus Mahasiswa"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          {/* Quick Status Dropdown Selector */}
+                          <select
+                            value={std.status || (std.active ? 'active' : 'temporary_inactive')}
+                            onChange={(e) => handleUpdateStudentAccountStatus(std.nim, e.target.value as StudentAccountStatus, std.name)}
+                            className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold cursor-pointer transition-all ${
+                              std.status === 'temporary_inactive'
+                                ? 'bg-amber-50 border-amber-300 text-amber-900'
+                                : std.status === 'permanent_inactive'
+                                ? 'bg-rose-50 border-rose-300 text-rose-900'
+                                : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                            }`}
+                            title="Atur Status Akun Mahasiswa"
+                          >
+                            <option value="active">✓ Aktifkan Akun</option>
+                            <option value="temporary_inactive">⏸ Nonaktifkan Sementara</option>
+                            <option value="permanent_inactive">✕ Akun Nonaktif Permanen</option>
+                          </select>
+
+                          {/* Edit Student Button */}
+                          <button
+                            onClick={() => handleOpenEditStudent(std)}
+                            className="p-1.5 rounded-lg text-teal-700 hover:bg-teal-50 hover:text-teal-900 transition-colors cursor-pointer border border-teal-200"
+                            title="Edit Data & Status Mahasiswa"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+
+                          {/* Delete Student Button */}
+                          <button
+                            onClick={() => handleDeleteStudent(std.nim, std.name)}
+                            className="p-1.5 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-800 transition-colors cursor-pointer border border-rose-200"
+                            title="Hapus Mahasiswa"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
 
                   {filteredStudents.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-400">
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
                         Belum ada data mahasiswa untuk filter yang dipilih.
                       </td>
                     </tr>
@@ -999,8 +1221,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
               </div>
             ) : examQuestions.map((q, idx) => (
               <div key={q.id} className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-3 text-xs">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 mb-3 text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="w-7 h-7 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 flex items-center justify-center font-bold">
                       {idx + 1}
                     </span>
@@ -1008,11 +1230,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                       {q.type.replace('_', ' ')}
                     </span>
                     <span className="text-slate-400 text-[11px]">Bobot: {q.points} Poin</span>
+                    <span className="text-xs font-bold text-emerald-700 font-mono ml-2">
+                      Kunci: {Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer}
+                    </span>
                   </div>
 
-                  <span className="text-xs font-bold text-emerald-700 font-mono">
-                    Kunci: {Array.isArray(q.correctAnswer) ? q.correctAnswer.join(', ') : q.correctAnswer}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleOpenEditQuestion(q)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs font-bold hover:bg-teal-100 transition-colors cursor-pointer shadow-xs"
+                      title="Edit butir soal ini"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-teal-700" />
+                      <span>Edit Soal</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteQuestion(q.id)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold hover:bg-rose-100 transition-colors cursor-pointer shadow-xs"
+                      title="Hapus butir soal"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Hapus</span>
+                    </button>
+                  </div>
                 </div>
 
                 <p className="text-xs sm:text-sm text-slate-800 font-medium leading-relaxed">
@@ -1422,6 +1663,496 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                 className="px-6 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-md shadow-teal-700/20"
               >
                 Simpan Soal ke Bank Ujian
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EDIT STUDENT (Requirement: Edit Data Mahasiswa & Status Akun) ================= */}
+      {showEditStudentModal && editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100 mb-5">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 font-extrabold text-[10px] uppercase tracking-wider">
+                  Edit Data & Status Mahasiswa
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-1">
+                  {editingStudent.name} ({editingStudent.nim})
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Ubah data pribadi, prodi, semester, dan kendalikan status aktif/nonaktif akun mahasiswa.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowEditStudentModal(false);
+                  setEditingStudent(null);
+                }}
+                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              {/* Form Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nomor Induk Mahasiswa (NIM): *</label>
+                  <input
+                    type="text"
+                    value={editingStudent.nim}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, nim: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs font-bold text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Nama Lengkap Mahasiswa: *</label>
+                  <input
+                    type="text"
+                    value={editingStudent.name}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Tahun Angkatan:</label>
+                  <select
+                    value={editingStudent.cohort}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, cohort: e.target.value })}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold"
+                  >
+                    {COHORTS.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Program Studi:</label>
+                  <select
+                    value={editingStudent.programSlug}
+                    onChange={(e) => {
+                      const matched = STUDY_PROGRAMS.find(p => p.slug === e.target.value);
+                      setEditingStudent({ 
+                        ...editingStudent, 
+                        programSlug: e.target.value,
+                        program: matched ? matched.name : editingStudent.program
+                      });
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white text-xs font-semibold"
+                  >
+                    {STUDY_PROGRAMS.map(p => (
+                      <option key={p.slug} value={p.slug}>{p.shortName}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Semester (1 - 8):</label>
+                  <select
+                    value={editingStudent.semester || 1}
+                    onChange={(e) => setEditingStudent({ ...editingStudent, semester: Number(e.target.value) })}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white font-bold text-teal-800 text-xs"
+                  >
+                    {SEMESTERS.map(s => (
+                      <option key={s} value={s}>Semester {s}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Email Mahasiswa (Google UPNVJ):</label>
+                <input
+                  type="email"
+                  value={editingStudent.email}
+                  onChange={(e) => setEditingStudent({ ...editingStudent, email: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                />
+              </div>
+
+              {/* Requirement: ATUR AKTIFKAN AKUN, NONAKTIFKAN SEMENTARA AKUN, DAN AKUN NONAKTIF PERMANEN */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-slate-800 font-black mb-2 text-xs uppercase tracking-wide">
+                  Pengaturan Status Akun Mahasiswa (Terintegrasi ke Login CBT):
+                </label>
+                
+                <div className="grid grid-cols-1 gap-2.5">
+                  {/* Status 1: Active */}
+                  <div
+                    onClick={() => setEditingStudent({ 
+                      ...editingStudent, 
+                      status: 'active',
+                      statusReason: undefined
+                    })}
+                    className={`p-3.5 rounded-2xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                      editingStudent.status === 'active' || (!editingStudent.status && editingStudent.active)
+                        ? 'bg-emerald-50/80 border-emerald-500 shadow-xs'
+                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="accountStatus"
+                      checked={editingStudent.status === 'active' || (!editingStudent.status && editingStudent.active)}
+                      onChange={() => {}}
+                      className="mt-1 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-emerald-950 text-xs">1. Aktifkan Akun (Normal)</span>
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">Status Utama</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-900 mt-0.5">
+                        Mahasiswa memiliki hak penuh untuk login Google dan masuk ke ruang ujian CBT sesuai jadwal studinya.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status 2: Temporary Inactive */}
+                  <div
+                    onClick={() => setEditingStudent({ 
+                      ...editingStudent, 
+                      status: 'temporary_inactive',
+                      statusReason: 'AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN'
+                    })}
+                    className={`p-3.5 rounded-2xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                      editingStudent.status === 'temporary_inactive'
+                        ? 'bg-amber-50/80 border-amber-500 shadow-xs'
+                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="accountStatus"
+                      checked={editingStudent.status === 'temporary_inactive'}
+                      onChange={() => {}}
+                      className="mt-1 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-amber-950 text-xs">2. Nonaktifkan Sementara Akun</span>
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10px] font-bold">Tangguhkan</span>
+                      </div>
+                      <p className="text-[11px] text-amber-900 mt-0.5 font-semibold">
+                        Pesan di web mahasiswa: <span className="italic font-bold">"AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN"</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Status 3: Permanent Inactive */}
+                  <div
+                    onClick={() => setEditingStudent({ 
+                      ...editingStudent, 
+                      status: 'permanent_inactive',
+                      statusReason: 'AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL "VETERAN" JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT'
+                    })}
+                    className={`p-3.5 rounded-2xl border-2 flex items-start gap-3 cursor-pointer transition-all ${
+                      editingStudent.status === 'permanent_inactive'
+                        ? 'bg-rose-50/80 border-rose-500 shadow-xs'
+                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="accountStatus"
+                      checked={editingStudent.status === 'permanent_inactive'}
+                      onChange={() => {}}
+                      className="mt-1 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-rose-950 text-xs">3. Akun Nonaktif Permanen</span>
+                        <span className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-900 text-[10px] font-bold">Diblokir</span>
+                      </div>
+                      <p className="text-[11px] text-rose-900 mt-0.5 font-semibold">
+                        Pesan di web mahasiswa: <span className="italic font-bold">"AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL &quot;VETERAN&quot; JAKARTA, JIKAA INII KELIRUU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT"</span> (Dilengkapi tombol Hubungi Helpdesk).
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Course Selection */}
+              <div className="pt-2 border-t border-slate-100">
+                <label className="block text-slate-700 font-bold mb-2">
+                  Daftar Mata Kuliah Terdaftar:
+                </label>
+                
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {(editingStudent.courses || []).map((c, i) => (
+                    <span key={i} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-teal-50 border border-teal-200 text-teal-900 text-xs">
+                      <span>{c}</span>
+                      <button
+                        type="button"
+                        onClick={() => setEditingStudent({
+                          ...editingStudent,
+                          courses: (editingStudent.courses || []).filter((_, idx) => idx !== i)
+                        })}
+                        className="text-rose-600 hover:text-rose-800 font-bold"
+                        title="Hapus mata kuliah ini"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {/* Add Custom Course */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Tambah nama mata kuliah..."
+                    value={editCustomCourseInput}
+                    onChange={(e) => setEditCustomCourseInput(e.target.value)}
+                    className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editCustomCourseInput.trim()) {
+                        setEditingStudent({
+                          ...editingStudent,
+                          courses: [...(editingStudent.courses || []), editCustomCourseInput.trim()]
+                        });
+                        setEditCustomCourseInput('');
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 font-bold text-xs cursor-pointer"
+                  >
+                    Tambah MK
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowEditStudentModal(false);
+                  setEditingStudent(null);
+                }}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveEditedStudent}
+                className="px-6 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-md shadow-teal-700/20 cursor-pointer transition-all"
+              >
+                Simpan Perubahan Mahasiswa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL: EDIT QUESTION (Requirement: Edit Soal yang Sudah Ada) ================= */}
+      {showEditQuestionModal && editingQuestion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-start justify-between pb-4 border-b border-slate-100 mb-5">
+              <div>
+                <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 font-extrabold text-[10px] uppercase tracking-wider">
+                  Edit Butir Soal
+                </span>
+                <h3 className="text-lg font-black text-slate-900 mt-1">
+                  Perbaiki Soal Nomor {editingQuestion.order}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Ubah naskah soal, bobot poin, opsi jawaban, gambar, atau kunci jawaban.
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowEditQuestionModal(false);
+                  setEditingQuestion(null);
+                }}
+                className="p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Tipe Soal:</label>
+                  <select
+                    value={editingQuestion.type}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, type: e.target.value as any })}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-300 bg-white font-bold text-xs"
+                  >
+                    <option value="multiple_choice">Pilihan Ganda (A - E)</option>
+                    <option value="multiple_choice_image">Pilihan Ganda Bergambar</option>
+                    <option value="true_false">Benar / Salah (True/False)</option>
+                    <option value="short_answer">Jawaban Singkat</option>
+                    <option value="essay">Uraian / Esai Komprehensif</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Bobot Poin Soal:</label>
+                  <input
+                    type="number"
+                    value={editingQuestion.points}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, points: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white font-mono text-xs font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Teks Pertanyaan Soal: *</label>
+                <textarea
+                  rows={4}
+                  placeholder="Ketikkan naskah soal secara lengkap..."
+                  value={editingQuestion.question}
+                  onChange={(e) => setEditingQuestion({ ...editingQuestion, question: e.target.value })}
+                  className="w-full p-3.5 rounded-xl border border-slate-300 bg-white text-xs leading-relaxed"
+                />
+              </div>
+
+              {/* Image attachment */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
+                <label className="block text-slate-700 font-bold">
+                  Lampiran Gambar Soal (Opsional):
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEditQuestionImageUpload}
+                    className="text-xs file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer"
+                  />
+                  <span className="text-slate-400">atau</span>
+                  <input
+                    type="text"
+                    placeholder="Tempel URL Gambar..."
+                    value={editingQuestion.imageUrl || ''}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, imageUrl: e.target.value })}
+                    className="flex-1 px-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs"
+                  />
+                </div>
+                {editingQuestion.imageUrl && (
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="max-w-xs rounded-xl overflow-hidden border border-slate-200 bg-white p-1">
+                      <img src={editingQuestion.imageUrl} alt="Preview" className="max-h-36 object-contain" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingQuestion({ ...editingQuestion, imageUrl: undefined })}
+                      className="text-rose-600 hover:text-rose-800 text-xs font-bold underline cursor-pointer"
+                    >
+                      Hapus Gambar
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Options Form for Multiple Choice */}
+              {(editingQuestion.type === 'multiple_choice' || editingQuestion.type === 'multiple_choice_image') && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <label className="block text-slate-700 font-bold">Pilihan Jawaban (A - E):</label>
+                  {editingQuestion.options?.map((opt, idx) => (
+                    <div key={opt.id} className="flex items-center gap-2">
+                      <span className="w-6 font-bold text-teal-800 text-center">{opt.id}</span>
+                      <input
+                        type="text"
+                        placeholder={`Teks pilihan ${opt.id}...`}
+                        value={opt.text}
+                        onChange={(e) => {
+                          const updated = [...(editingQuestion.options || [])];
+                          updated[idx] = { ...updated[idx], text: e.target.value };
+                          setEditingQuestion({ ...editingQuestion, options: updated });
+                        }}
+                        className="flex-1 px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs"
+                      />
+                    </div>
+                  ))}
+
+                  <div className="mt-2 flex items-center gap-3 pt-2">
+                    <span className="font-bold text-slate-700">Kunci Jawaban Benar:</span>
+                    <select
+                      value={editingQuestion.correctAnswer as string}
+                      onChange={(e) => setEditingQuestion({ ...editingQuestion, correctAnswer: e.target.value })}
+                      className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-emerald-800 bg-white text-xs"
+                    >
+                      {['A', 'B', 'C', 'D', 'E'].map(o => (
+                        <option key={o} value={o}>Pilihan {o}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* True/False selection */}
+              {editingQuestion.type === 'true_false' && (
+                <div className="flex items-center gap-3 pt-2">
+                  <span className="font-bold text-slate-700">Kunci Jawaban Benar:</span>
+                  <select
+                    value={editingQuestion.correctAnswer as string}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, correctAnswer: e.target.value })}
+                    className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-emerald-800 bg-white text-xs"
+                  >
+                    <option value="Benar">Benar</option>
+                    <option value="Salah">Salah</option>
+                  </select>
+                </div>
+              )}
+
+              {/* Short Answer / Essay Rubric */}
+              {(editingQuestion.type === 'short_answer' || editingQuestion.type === 'essay') && (
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Kunci Jawaban / Kata Kunci Penilaian:</label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: IFRS / Transparansi / Rasio Lancar"
+                    value={editingQuestion.correctAnswer as string}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, correctAnswer: e.target.value })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                  />
+                </div>
+              )}
+
+              {/* Explanation */}
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Penjelasan / Pembahasan Soal (Opsional):</label>
+                <input
+                  type="text"
+                  placeholder="Penjelasan ringkas kunci jawaban..."
+                  value={editingQuestion.explanation || ''}
+                  onChange={(e) => setEditingQuestion({ ...editingQuestion, explanation: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                />
+              </div>
+
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowEditQuestionModal(false);
+                  setEditingQuestion(null);
+                }}
+                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSaveEditedQuestion}
+                className="px-6 py-2 rounded-xl bg-teal-700 hover:bg-teal-800 text-white font-bold text-xs shadow-md shadow-teal-700/20 cursor-pointer transition-all"
+              >
+                Simpan Perubahan Soal
               </button>
             </div>
           </div>

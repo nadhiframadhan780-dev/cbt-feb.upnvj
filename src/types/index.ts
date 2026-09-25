@@ -22,6 +22,8 @@ export interface StudyProgram {
   active: boolean;
 }
 
+export type StudentAccountStatus = 'active' | 'temporary_inactive' | 'permanent_inactive';
+
 export interface StudentProfile {
   id?: string;
   uid: string;
@@ -35,6 +37,8 @@ export interface StudentProfile {
   courses: string[]; // Daftar mata kuliah yang diambil di semester tsb
   photoUrl?: string;
   active: boolean;
+  status?: StudentAccountStatus; // 'active' | 'temporary_inactive' | 'permanent_inactive'
+  statusReason?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -6,13 +6,14 @@ import {
   onAuthStateChanged 
 } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
-import { StudentProfile, AdminUser } from '../types';
+import { StudentProfile, StudentAccountStatus, AdminUser } from '../types';
 import { getStudentProfile, saveStudentProfile, DEFAULT_STUDENTS } from '../services/firestoreService';
 import { STUDY_PROGRAMS, PRODI_COURSES_MAP, COHORTS } from '../constants/programs';
 
 export interface StudentValidationResult {
   success: boolean;
   errorField?: 'nama' | 'nim' | 'angkatan' | 'prodi' | 'general';
+  accountStatus?: StudentAccountStatus;
   message?: string;
 }
 
@@ -117,9 +118,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Try looking up student profile in Firestore
         const profile = await getStudentProfile(email);
         if (profile) {
-          setStudent(profile);
-          if (profile.programSlug) {
-            setSelectedProgramSlug(profile.programSlug);
+          if (profile.status === 'temporary_inactive') {
+            setError('AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN');
+            setStudent({ ...profile, active: false, status: 'temporary_inactive' });
+            if (profile.programSlug) {
+              setSelectedProgramSlug(profile.programSlug);
+            }
+          } else if (profile.status === 'permanent_inactive') {
+            setError('AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL "VETERAN" JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT');
+            setStudent({ ...profile, active: false, status: 'permanent_inactive' });
+            if (profile.programSlug) {
+              setSelectedProgramSlug(profile.programSlug);
+            }
+          } else {
+            setStudent(profile);
+            if (profile.programSlug) {
+              setSelectedProgramSlug(profile.programSlug);
+            }
           }
         }
       } else {
@@ -378,8 +393,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const matchedProdi = STUDY_PROGRAMS.find(p => p.slug === selectedProgramSlug);
     const targetProgramName = matchedProdi ? matchedProdi.name : 'S1 Akuntansi';
 
-    // 4. Validasi Kesesuaian Program Studi
+    // 4. Validasi Kesesuaian Program Studi & Status Akun
     if (existing) {
+      if (existing.status === 'temporary_inactive') {
+        const msg = 'AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN';
+        setError(msg);
+        setLoading(false);
+        return {
+          success: false,
+          errorField: 'general',
+          accountStatus: 'temporary_inactive',
+          message: msg
+        };
+      }
+
+      if (existing.status === 'permanent_inactive') {
+        const msg = 'AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL "VETERAN" JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT';
+        setError(msg);
+        setLoading(false);
+        return {
+          success: false,
+          errorField: 'general',
+          accountStatus: 'permanent_inactive',
+          message: msg
+        };
+      }
+
       if (existing.programSlug && existing.programSlug !== selectedProgramSlug) {
         const msg = `Bagian Program Studi salah! NIM ${cleanNim} terdaftar di prodi "${existing.program}", sedangkan Anda memilih portal "${targetProgramName}". Harap pilih portal program studi yang tepat.`;
         setError(msg);
@@ -395,7 +434,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         program: targetProgramName,
         programSlug: selectedProgramSlug,
         semester: existing.semester || 1,
-        courses: existing.courses || PRODI_COURSES_MAP[selectedProgramSlug]?.[1] || []
+        courses: existing.courses || PRODI_COURSES_MAP[selectedProgramSlug]?.[1] || [],
+        status: existing.status || 'active',
+        active: existing.status ? existing.status === 'active' : true
       };
 
       setStudent(activeProfile);
@@ -416,6 +457,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       semester: 1,
       courses: PRODI_COURSES_MAP[selectedProgramSlug]?.[1] || [],
       active: true,
+      status: 'active',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

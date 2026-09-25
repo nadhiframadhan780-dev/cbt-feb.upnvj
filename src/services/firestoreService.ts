@@ -15,6 +15,7 @@ import {
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
   StudentProfile, 
+  StudentAccountStatus,
   DeanProfile, 
   Course, 
   Exam, 
@@ -296,10 +297,11 @@ export const DEFAULT_STUDENTS: StudentProfile[] = [
     nim: '2310111001',
     program: 'S1 Akuntansi',
     programSlug: 'cbt-s1-akuntansi',
-    cohort: '2026',
+    cohort: '2023',
     semester: 1,
     courses: PRODI_COURSES_MAP['cbt-s1-akuntansi'][1],
     active: true,
+    status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -310,10 +312,11 @@ export const DEFAULT_STUDENTS: StudentProfile[] = [
     nim: '2410112045',
     program: 'S1 Manajemen',
     programSlug: 'cbt-s1-manajemen',
-    cohort: '2025',
+    cohort: '2024',
     semester: 3,
     courses: PRODI_COURSES_MAP['cbt-s1-manajemen'][3],
     active: true,
+    status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -324,10 +327,11 @@ export const DEFAULT_STUDENTS: StudentProfile[] = [
     nim: '2510115012',
     program: 'D3 Perbankan dan Keuangan',
     programSlug: 'cbt-d3-perbankan-keuangan',
-    cohort: '2026',
+    cohort: '2025',
     semester: 1,
     courses: PRODI_COURSES_MAP['cbt-d3-perbankan-keuangan'][1],
     active: true,
+    status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -338,10 +342,11 @@ export const DEFAULT_STUDENTS: StudentProfile[] = [
     nim: '2310114022',
     program: 'D3 Akuntansi',
     programSlug: 'cbt-d3-akuntansi',
-    cohort: '2024',
+    cohort: '2023',
     semester: 4,
     courses: PRODI_COURSES_MAP['cbt-d3-akuntansi'][4],
     active: true,
+    status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -352,10 +357,11 @@ export const DEFAULT_STUDENTS: StudentProfile[] = [
     nim: '2410113088',
     program: 'S1 Ekonomi Syariah',
     programSlug: 'cbt-s1-ekonomi-syariah',
-    cohort: '2025',
+    cohort: '2024',
     semester: 3,
     courses: PRODI_COURSES_MAP['cbt-s1-ekonomi-syariah'][3],
     active: true,
+    status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -366,10 +372,11 @@ export const DEFAULT_STUDENTS: StudentProfile[] = [
     nim: '2310116034',
     program: 'S1 Ekonomi Pembangunan',
     programSlug: 'cbt-s1-ekonomi-pembangunan',
-    cohort: '2026',
+    cohort: '2023',
     semester: 1,
     courses: PRODI_COURSES_MAP['cbt-s1-ekonomi-pembangunan'][1],
     active: true,
+    status: 'active',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   }
@@ -559,10 +566,55 @@ export async function saveBulkStudents(students: StudentProfile[]): Promise<numb
 // Service: Delete Student
 export async function deleteStudentProfile(nim: string): Promise<boolean> {
   try {
+    localStorage.removeItem(`cbt_student_${nim}`);
+  } catch {}
+  try {
     await deleteDoc(doc(db, 'students', nim));
     return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, `students/${nim}`);
+    return false;
+  }
+}
+
+// Service: Update Student Account Status (active | temporary_inactive | permanent_inactive)
+export async function updateStudentAccountStatus(
+  nim: string,
+  status: StudentAccountStatus,
+  statusReason?: string
+): Promise<boolean> {
+  const reason = statusReason || (
+    status === 'temporary_inactive' 
+      ? 'AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN'
+      : status === 'permanent_inactive'
+      ? 'AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL "VETERAN" JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT'
+      : undefined
+  );
+
+  try {
+    const studentRef = doc(db, 'students', nim);
+    await setDoc(studentRef, {
+      status,
+      active: status === 'active',
+      statusReason: reason,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    // Update local cache
+    try {
+      const cached = localStorage.getItem(`cbt_student_${nim}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        parsed.status = status;
+        parsed.active = status === 'active';
+        parsed.statusReason = reason;
+        localStorage.setItem(`cbt_student_${nim}`, JSON.stringify(parsed));
+      }
+    } catch {}
+
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `students/${nim}/status`);
     return false;
   }
 }
@@ -673,6 +725,17 @@ export async function saveBulkQuestions(questions: Question[]): Promise<number> 
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'questions_bulk');
     return count;
+  }
+}
+
+// Service: Delete Question
+export async function deleteQuestion(questionId: string): Promise<boolean> {
+  try {
+    await deleteDoc(doc(db, 'questions', questionId));
+    return true;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `questions/${questionId}`);
+    return false;
   }
 }
 
