@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { DeanProfile } from '../types';
-import { getDeanProfile, DEFAULT_DEAN_PROFILE } from '../services/firestoreService';
+import { getDeanProfile, DEFAULT_DEAN_PROFILE, DEKAN_FEB_PHOTO_URL } from '../services/firestoreService';
 import { Quote, Award, Shield, CheckCircle2 } from 'lucide-react';
 
 export const SambutanDekan: React.FC = () => {
@@ -48,11 +48,15 @@ export const SambutanDekan: React.FC = () => {
             <div className="lg:col-span-4 flex flex-col items-center text-center">
               <div className="relative group">
                 <div className="absolute -inset-1.5 bg-gradient-to-r from-amber-400 via-teal-500 to-emerald-600 rounded-3xl blur-sm opacity-50 group-hover:opacity-80 transition duration-500" />
-                <div className="relative w-52 h-64 sm:w-60 sm:h-72 rounded-2xl overflow-hidden bg-white shadow-md border-2 border-white">
+                <div className="relative w-52 h-64 sm:w-60 sm:h-72 rounded-2xl overflow-hidden bg-slate-100 shadow-md border-2 border-white">
                   <img
-                    src={profile.photoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600'}
+                    src={profile.photoUrl || DEKAN_FEB_PHOTO_URL}
                     alt={profile.name}
                     className="w-full h-full object-cover object-top transition duration-500 group-hover:scale-105"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = DEKAN_FEB_PHOTO_URL;
+                    }}
+                    loading="lazy"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent flex items-end justify-center p-4">
                     <span className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">

@@ -16,6 +16,7 @@ import {
   DEFAULT_COURSES, 
   getDefaultExams, 
   DEFAULT_DEAN_PROFILE,
+  DEKAN_FEB_PHOTO_URL,
   seedInitialFirestoreData,
   getDeanProfile,
   updateDeanProfile,
@@ -1386,6 +1387,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
                   onChange={(e) => setDean({ ...dean, title: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
                 />
+              </div>
+            </div>
+
+            <div className="mb-4 text-xs">
+              <label className="block text-slate-600 font-bold mb-1">URL Foto Resmi Dekan:</label>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <input
+                  type="text"
+                  value={dean.photoUrl || DEKAN_FEB_PHOTO_URL}
+                  onChange={(e) => setDean({ ...dean, photoUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={() => setDean({ ...dean, photoUrl: DEKAN_FEB_PHOTO_URL })}
+                  className="whitespace-nowrap px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer border border-slate-300"
+                >
+                  Reset Default UPNVJ
+                </button>
+              </div>
+              <div className="mt-3 flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <img
+                  src={dean.photoUrl || DEKAN_FEB_PHOTO_URL}
+                  alt={dean.name}
+                  className="w-14 h-14 rounded-xl object-cover object-top border border-slate-300"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = DEKAN_FEB_PHOTO_URL;
+                  }}
+                />
+                <div className="text-[11px] text-slate-600">
+                  <span className="font-bold text-slate-800 block">Pratinjau Foto Dekan</span>
+                  <span className="text-[10px] text-slate-500 font-mono truncate max-w-sm block">
+                    {dean.photoUrl || DEKAN_FEB_PHOTO_URL}
+                  </span>
+                </div>
               </div>
             </div>
 

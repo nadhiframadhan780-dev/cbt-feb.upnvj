@@ -64,12 +64,15 @@ export function sanitizeForFirestore<T>(data: T): T {
   return data;
 }
 
+// Official Photo URL of Prof. Dr. Jubaedah, S.E., M.M. (Dekan FEB UPNVJ)
+export const DEKAN_FEB_PHOTO_URL = 'https://feb.upnvj.ac.id/wp-content/uploads/2023/06/Dekan.png';
+
 // Default initial Dean Profile
 export const DEFAULT_DEAN_PROFILE: DeanProfile = {
   name: 'Prof. Dr. Jubaedah, S.E., M.M.',
   title: 'Dekan Fakultas Ekonomi dan Bisnis',
   position: 'Dekan FEB UPN “Veteran” Jakarta',
-  photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=600',
+  photoUrl: DEKAN_FEB_PHOTO_URL,
   greeting: 'Selamat datang di portal CBT FEB UPN “Veteran” Jakarta. Sistem ujian digital ini dirancang untuk menjunjung tinggi integritas akademik, transparansi, dan efisiensi dalam pelaksanaan UTS dan UAS. Kami mengimbau seluruh mahasiswa untuk selalu mengedepankan kejujuran, disiplin, dan nilai-nilai Bela Negara.',
   updatedAt: new Date().toISOString()
 };
@@ -476,7 +479,11 @@ export async function getDeanProfile(): Promise<DeanProfile> {
   try {
     const docSnap = await getDoc(doc(db, 'deanProfile', 'current'));
     if (docSnap.exists()) {
-      return docSnap.data() as DeanProfile;
+      const data = docSnap.data() as DeanProfile;
+      if (!data.photoUrl || data.photoUrl.includes('unsplash.com')) {
+        data.photoUrl = DEKAN_FEB_PHOTO_URL;
+      }
+      return data;
     }
     return DEFAULT_DEAN_PROFILE;
   } catch (error) {
