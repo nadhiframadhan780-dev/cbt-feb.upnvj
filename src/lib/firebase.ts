@@ -4,18 +4,18 @@ import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import appletConfig from '../../firebase-applet-config.json';
 
 export const firebaseConfig = {
-  apiKey: appletConfig.apiKey,
-  authDomain: appletConfig.authDomain,
-  projectId: appletConfig.projectId,
-  storageBucket: appletConfig.storageBucket,
-  messagingSenderId: appletConfig.messagingSenderId,
-  appId: appletConfig.appId
+  apiKey: appletConfig.apiKey || "AIzaSyAH_IWTgtcG7STm66HRPfxEci4EUXYxBV0",
+  authDomain: appletConfig.authDomain || "cbt-feb-upnvj.firebaseapp.com",
+  projectId: appletConfig.projectId || "cbt-feb-upnvj",
+  storageBucket: appletConfig.storageBucket || "cbt-feb-upnvj.firebasestorage.app",
+  messagingSenderId: appletConfig.messagingSenderId || "314086597951",
+  appId: appletConfig.appId || "1:314086597951:web:7117f906469d7b4f1e5f8a"
 };
 
 // Initialize Firebase App
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
-export const db = appletConfig.firestoreDatabaseId
+export const db = (appletConfig.firestoreDatabaseId && appletConfig.firestoreDatabaseId !== '(default)' && appletConfig.firestoreDatabaseId !== '')
   ? getFirestore(app, appletConfig.firestoreDatabaseId)
   : getFirestore(app);
 

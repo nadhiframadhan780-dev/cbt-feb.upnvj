@@ -7,8 +7,14 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { StudentProfile, AdminUser } from '../types';
-import { getStudentProfile, DEFAULT_STUDENTS } from '../services/firestoreService';
-import { STUDY_PROGRAMS, PRODI_COURSES_MAP } from '../constants/programs';
+import { getStudentProfile, saveStudentProfile, DEFAULT_STUDENTS } from '../services/firestoreService';
+import { STUDY_PROGRAMS, PRODI_COURSES_MAP, COHORTS } from '../constants/programs';
+
+export interface StudentValidationResult {
+  success: boolean;
+  errorField?: 'nama' | 'nim' | 'angkatan' | 'prodi' | 'general';
+  message?: string;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -23,16 +29,28 @@ interface AuthContextType {
   loginAdminWithGoogle: () => Promise<{ success: boolean; message: string }>;
   loginAdminWithPasscode: (email: string, passcode: string) => Promise<{ success: boolean; message: string }>;
   logout: () => Promise<void>;
-  validateStudentData: (nama: string, nim: string, cohort: string) => Promise<boolean>;
+  validateStudentData: (nama: string, nim: string, cohort: string) => Promise<StudentValidationResult>;
   setDemoStudent: (student: StudentProfile) => void;
   clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Whitelisted student domains: @upnvj.ac.id, plus Google accounts
-export const ALLOWED_DOMAINS = ['upnvj.ac.id', 'gmail.com'];
+// Whitelisted student domains: @upnvj.ac.id, @mahasiswa.upnvj.ac.id, plus Google accounts
+export const ALLOWED_DOMAINS = ['upnvj.ac.id', 'mahasiswa.upnvj.ac.id', 'gmail.com'];
 export const AUTHORIZED_ADMIN_EMAIL = 'nadhiframadhan780@gmail.com';
+
+export const isDomainAllowed = (email: string): boolean => {
+  const clean = email.toLowerCase().trim();
+  const domain = clean.split('@')[1] || '';
+  return (
+    domain === 'upnvj.ac.id' ||
+    domain.endsWith('.upnvj.ac.id') ||
+    domain === 'gmail.com' ||
+    ALLOWED_DOMAINS.includes(domain) ||
+    clean === AUTHORIZED_ADMIN_EMAIL.toLowerCase()
+  );
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -119,31 +137,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Standard student Google Sign-In
   const loginWithGoogle = async (): Promise<boolean> => {
     try {
-      if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-        setError('Otorisasi Google tidak diaktifkan pada domain Vercel. Silakan gunakan Nama, NIM, dan Angkatan di formulir utama.');
-        return false;
-      }
       setLoading(true);
       setError(null);
       const result = await signInWithPopup(auth, googleProvider);
       const email = (result.user.email || '').toLowerCase().trim();
-      const domain = email.split('@')[1];
 
-      const isDomainAllowed = 
-        ALLOWED_DOMAINS.includes(domain) ||
-        email === AUTHORIZED_ADMIN_EMAIL.toLowerCase();
-
-      if (!isDomainAllowed) {
+      if (!isDomainAllowed(email)) {
         await fbSignOut(auth);
         setUser(null);
         setStudent(null);
         setError(
-          'Akses Ditolak: Akun Google yang digunakan (' + email + ') bukan domain resmi yang diperbolehkan. Gunakan email @upnvj.ac.id atau akun Google yang terdaftar.'
+          `Akses Ditolak: Akun Google (${email}) bukan domain resmi yang diperbolehkan. Harap gunakan email @upnvj.ac.id atau akun Google yang terdaftar.`
         );
         setLoading(false);
         return false;
       }
 
+      setUser(result.user);
+
+      // Check if profile exists in Firestore
+      const profile = await getStudentProfile(email);
+      if (profile) {
+        setStudent(profile);
+        if (profile.programSlug) {
+          setSelectedProgramSlug(profile.programSlug);
+        }
+      }
+
+      setLoading(false);
       return true;
     } catch (err: any) {
       console.error('Google Sign-In Error:', err);
@@ -151,7 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setError('Proses login Google dibatalkan.');
       } else if (err.code === 'auth/unauthorized-domain') {
         setError(
-          `Domain (${window.location.hostname}) belum didaftarkan di Firebase. Silakan buka Firebase Console -> Authentication -> Settings -> Authorized Domains, lalu tambahkan '${window.location.hostname}'.`
+          `Domain (${window.location.hostname}) belum didaftarkan di Authorized Domains Firebase proyek cbt-feb-upnvj. Silakan tambahkan '${window.location.hostname}' di Firebase Console -> Authentication -> Settings -> Authorized domains.`
         );
       } else if (err.code === 'auth/network-request-failed') {
         setError('Koneksi internet bermasalah saat menghubungi server autentikasi.');
@@ -166,12 +187,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // EXCLUSIVE ADMIN GOOGLE SIGN-IN (Only nadhiframadhan780@gmail.com)
   const loginAdminWithGoogle = async (): Promise<{ success: boolean; message: string }> => {
     try {
-      if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-        return {
-          success: false,
-          message: 'Google Sign-In tidak didukung pada domain Vercel. Silakan gunakan tab Kode Master Vercel (febupnvj2026).'
-        };
-      }
       setLoading(true);
       setError(null);
       const result = await signInWithPopup(auth, googleProvider);
@@ -213,7 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (err.code === 'auth/unauthorized-domain') {
         return { 
           success: false, 
-          message: `Domain Vercel (${window.location.hostname}) belum diizinkan di Firebase! Anda dapat menggunakan opsi 'Kode Master Darurat' di bawah untuk langsung masuk.` 
+          message: `Domain (${window.location.hostname}) belum diizinkan di Authorized Domains Firebase proyek cbt-feb-upnvj! Tambahkan '${window.location.hostname}' di Firebase Console -> Authentication -> Settings -> Authorized domains. Atau gunakan 'Kode Master' di tab sebelah untuk langsung masuk.` 
         };
       }
       return { success: false, message: 'Gagal autentikasi Google: ' + (err.message || 'Coba lagi.') };
@@ -276,52 +291,107 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Validate student inputs against Firestore database
-  const validateStudentData = async (nama: string, nim: string, cohort: string): Promise<boolean> => {
+  // Validate student inputs against Firestore database with specific error field reporting
+  const validateStudentData = async (
+    nama: string,
+    nim: string,
+    cohort: string
+  ): Promise<StudentValidationResult> => {
     if (!selectedProgramSlug) {
-      setError('Silakan pilih Program Studi terlebih dahulu.');
-      return false;
+      const msg = 'Silakan pilih Program Studi ujian terlebih dahulu.';
+      setError(msg);
+      return { success: false, errorField: 'prodi', message: msg };
     }
 
-    if (!nama.trim() || !nim.trim() || !cohort.trim()) {
-      setError('Seluruh kolom (Nama Lengkap, NIM, dan Angkatan) wajib diisi.');
-      return false;
+    const cleanNama = nama.trim();
+    const cleanNim = nim.trim();
+    const cleanCohort = cohort.trim();
+
+    // 1. Validasi Bagian Nama Lengkap
+    if (!cleanNama) {
+      const msg = 'Bagian Nama Lengkap masih kosong! Harap masukkan nama lengkap Anda.';
+      setError(msg);
+      return { success: false, errorField: 'nama', message: msg };
+    }
+    if (cleanNama.length < 3) {
+      const msg = 'Bagian Nama Lengkap terlalu pendek! Nama harus memiliki minimal 3 karakter.';
+      setError(msg);
+      return { success: false, errorField: 'nama', message: msg };
+    }
+    if (!/^[a-zA-Z\s.,'-]+$/.test(cleanNama)) {
+      const msg = 'Bagian Nama Lengkap tidak valid! Hanya boleh berisi huruf dan tanda baca resmi.';
+      setError(msg);
+      return { success: false, errorField: 'nama', message: msg };
+    }
+
+    // 2. Validasi Bagian NIM
+    if (!cleanNim) {
+      const msg = 'Bagian NIM masih kosong! Harap masukkan Nomor Induk Mahasiswa Anda.';
+      setError(msg);
+      return { success: false, errorField: 'nim', message: msg };
+    }
+    if (!/^[0-9]+$/.test(cleanNim)) {
+      const msg = 'Bagian NIM tidak valid! NIM harus berupa angka tanpa spasi atau huruf.';
+      setError(msg);
+      return { success: false, errorField: 'nim', message: msg };
+    }
+    if (cleanNim.length !== 10) {
+      const msg = `Bagian NIM salah! Format NIM UPNVJ terdiri dari 10 digit angka (Anda memasukkan ${cleanNim.length} digit). Contoh yang benar: 2310111001.`;
+      setError(msg);
+      return { success: false, errorField: 'nim', message: msg };
     }
 
     setLoading(true);
     setError(null);
 
-    const email = user?.email || `${nim.trim()}@mahasiswa.upnvj.ac.id`;
+    const email = user?.email || `${cleanNim}@mahasiswa.upnvj.ac.id`;
     
     // Check in Firestore
-    let existing = await getStudentProfile(email, nim);
+    let existing = await getStudentProfile(email, cleanNim);
     
     // Also check default local registry as reliable fallback
     if (!existing) {
-      const matched = DEFAULT_STUDENTS.find(s => s.nim.trim() === nim.trim());
+      const matched = DEFAULT_STUDENTS.find(s => s.nim.trim() === cleanNim);
       if (matched) {
         existing = matched;
+      }
+    }
+
+    // 3. Validasi Bagian Angkatan
+    if (!cleanCohort) {
+      const msg = 'Bagian Angkatan belum dipilih! Harap tentukan tahun angkatan Anda.';
+      setError(msg);
+      setLoading(false);
+      return { success: false, errorField: 'angkatan', message: msg };
+    }
+    const nimYearPrefix = cleanNim.substring(0, 2);
+    const expectedCohort = `20${nimYearPrefix}`;
+    if (COHORTS.includes(expectedCohort) && expectedCohort !== cleanCohort) {
+      if (!existing || existing.cohort !== cleanCohort) {
+        const msg = `Bagian Angkatan tidak sesuai! 2 digit awal NIM Anda '${nimYearPrefix}' mengindikasikan Angkatan ${expectedCohort}, namun Anda memilih Angkatan ${cleanCohort}. Harap periksa kembali.`;
+        setError(msg);
+        setLoading(false);
+        return { success: false, errorField: 'angkatan', message: msg };
       }
     }
 
     const matchedProdi = STUDY_PROGRAMS.find(p => p.slug === selectedProgramSlug);
     const targetProgramName = matchedProdi ? matchedProdi.name : 'S1 Akuntansi';
 
+    // 4. Validasi Kesesuaian Program Studi
     if (existing) {
-      // Check program alignment
       if (existing.programSlug && existing.programSlug !== selectedProgramSlug) {
-        setError(
-          `Data ditemukan, namun Anda terdaftar pada program studi "${existing.program}". Harap pilih portal CBT yang sesuai.`
-        );
+        const msg = `Bagian Program Studi salah! NIM ${cleanNim} terdaftar di prodi "${existing.program}", sedangkan Anda memilih portal "${targetProgramName}". Harap pilih portal program studi yang tepat.`;
+        setError(msg);
         setLoading(false);
-        return false;
+        return { success: false, errorField: 'prodi', message: msg };
       }
 
       const activeProfile: StudentProfile = {
         ...existing,
-        name: nama.trim(),
-        nim: nim.trim(),
-        cohort: cohort.trim(),
+        name: cleanNama,
+        nim: cleanNim,
+        cohort: cleanCohort,
         program: targetProgramName,
         programSlug: selectedProgramSlug,
         semester: existing.semester || 1,
@@ -329,19 +399,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
 
       setStudent(activeProfile);
+      saveStudentProfile(activeProfile).catch(e => console.warn('Could not sync student to firestore:', e));
       setLoading(false);
-      return true;
+      return { success: true };
     }
 
     // If new student registering on the fly
     const newProfile: StudentProfile = {
-      uid: user?.uid || `gen_std_${nim.trim()}`,
+      uid: user?.uid || `gen_std_${cleanNim}`,
       email,
-      name: nama.trim(),
-      nim: nim.trim(),
+      name: cleanNama,
+      nim: cleanNim,
       program: targetProgramName,
       programSlug: selectedProgramSlug,
-      cohort: cohort.trim(),
+      cohort: cleanCohort,
       semester: 1,
       courses: PRODI_COURSES_MAP[selectedProgramSlug]?.[1] || [],
       active: true,
@@ -350,8 +421,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     setStudent(newProfile);
+    saveStudentProfile(newProfile).catch(e => console.warn('Could not sync student to firestore:', e));
     setLoading(false);
-    return true;
+    return { success: true };
   };
 
   const setDemoStudent = (demoStudent: StudentProfile) => {

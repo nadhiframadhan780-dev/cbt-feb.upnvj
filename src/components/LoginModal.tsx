@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { STUDY_PROGRAMS, COHORTS, UPNVJ_LOGO, PRODI_COURSES_MAP } from '../constants/programs';
 import { 
@@ -8,7 +8,12 @@ import {
   CheckCircle2, 
   AlertCircle,
   Sparkles,
-  UserCheck
+  UserCheck,
+  LogOut,
+  Mail,
+  User as UserIcon,
+  Hash,
+  Calendar
 } from 'lucide-react';
 
 interface LoginModalProps {
@@ -22,6 +27,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
     user, 
     student, 
     loginWithGoogle, 
+    logout,
     validateStudentData, 
     error, 
     clearError,
@@ -35,6 +41,39 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
   const [angkatan, setAngkatan] = useState('2026');
   const [submitting, setSubmitting] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [fieldError, setFieldError] = useState<{
+    field: 'nama' | 'nim' | 'angkatan' | 'prodi' | 'general' | null;
+    message: string | null;
+  }>({ field: null, message: null });
+
+  // Sync Google user profile when user logs in
+  useEffect(() => {
+    if (user) {
+      if (user.displayName && !namaLengkap) {
+        setNamaLengkap(user.displayName);
+      }
+      if (user.email && !nim) {
+        const emailUser = user.email.split('@')[0];
+        const match = emailUser.match(/^[0-9]{8,12}$/);
+        if (match) {
+          setNim(match[0]);
+          if (match[0].length >= 2) {
+            const prefix = match[0].substring(0, 2);
+            setAngkatan(`20${prefix}`);
+          }
+        }
+      }
+    }
+  }, [user]);
+
+  // Sync with existing student profile if found in Firestore
+  useEffect(() => {
+    if (student) {
+      if (student.name) setNamaLengkap(student.name);
+      if (student.nim) setNim(student.nim);
+      if (student.cohort) setAngkatan(student.cohort);
+    }
+  }, [student]);
 
   if (!isOpen) return null;
 
@@ -42,12 +81,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
 
   const handleGoogleLogin = async () => {
     clearError();
+    setFieldError({ field: null, message: null });
     setGoogleLoading(true);
     try {
-      const success = await loginWithGoogle();
-      if (success && user?.displayName) {
-        setNamaLengkap(user.displayName);
-      }
+      await loginWithGoogle();
     } finally {
       setGoogleLoading(false);
     }
@@ -55,17 +92,29 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
 
   const handleStudentValidation = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProgramSlug) return;
+    if (!selectedProgramSlug) {
+      setFieldError({
+        field: 'prodi',
+        message: 'Silakan pilih Program Studi ujian terlebih dahulu.'
+      });
+      return;
+    }
 
     setSubmitting(true);
     clearError();
+    setFieldError({ field: null, message: null });
 
-    const ok = await validateStudentData(namaLengkap, nim, angkatan);
+    const result = await validateStudentData(namaLengkap, nim, angkatan);
     setSubmitting(false);
 
-    if (ok) {
+    if (result.success) {
       onSuccess(selectedProgramSlug);
       onClose();
+    } else {
+      setFieldError({
+        field: result.errorField || 'general',
+        message: result.message || 'Terjadi kesalahan data. Periksa kembali input Anda.'
+      });
     }
   };
 
@@ -76,7 +125,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
     setNim(demoNim);
     setAngkatan(demoCohort);
     
-    // Set authenticated demo student
     const matchedProg = STUDY_PROGRAMS.find(p => p.slug === prodiSlug);
     setDemoStudent({
       uid: 'demo-' + demoNim,
@@ -125,7 +173,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
                 Masuk CBT FEB UPNVJ
               </h3>
               <p className="text-xs text-slate-500">
-                Verifikasi Peserta Ujian Digital Semester
+                Verifikasi Peserta Ujian Digital Mahasiswa
               </p>
             </div>
           </div>
@@ -135,13 +183,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
             <div className="space-y-4">
               <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
-                <span>Pilih Program Studi Anda di bawah ini untuk memulai login ujian:</span>
+                <span>Pilih Program Studi Anda di bawah ini untuk memulai:</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {STUDY_PROGRAMS.map((prog) => (
                   <button
                     key={prog.id}
-                    onClick={() => setSelectedProgramSlug(prog.slug)}
+                    onClick={() => {
+                      setSelectedProgramSlug(prog.slug);
+                      setFieldError({ field: null, message: null });
+                    }}
                     className="p-3 text-left rounded-xl border border-slate-200 hover:border-teal-600 hover:bg-teal-50 transition-all flex items-center gap-2.5 cursor-pointer group"
                   >
                     <img src={prog.logoUrl} alt="" className="w-8 h-8 object-contain group-hover:scale-105 transition-transform" />
@@ -177,108 +228,42 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
                 </button>
               </div>
 
-              {/* Error Message Display */}
-              {error && (
-                <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2.5">
+              {/* Top Level Error Banner */}
+              {(error || fieldError.message) && (
+                <div className="mb-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2.5 animate-in fade-in">
                   <ShieldAlert className="w-4 h-4 flex-shrink-0 text-rose-600 mt-0.5" />
                   <div className="space-y-1">
-                    <p className="font-bold text-rose-900">Perhatian:</p>
-                    <p className="leading-relaxed">{error}</p>
+                    <p className="font-bold text-rose-900">
+                      {fieldError.field 
+                        ? `Peringatan pada Bagian ${fieldError.field.toUpperCase()}:` 
+                        : 'Perhatian:'}
+                    </p>
+                    <p className="leading-relaxed">{fieldError.message || error}</p>
                   </div>
                 </div>
               )}
 
-              {/* Main Student Entry Form (Direct & Reliable) */}
-              <form onSubmit={handleStudentValidation} className="space-y-3.5 text-left">
-                {user ? (
-                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    <span className="truncate">Akun Google Terhubung: <b>{user.email}</b></span>
-                  </div>
-                ) : null}
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Nama Lengkap Mahasiswa
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Nadhif Ramadhan"
-                    value={namaLengkap}
-                    onChange={(e) => setNamaLengkap(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-teal-600 shadow-2xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    NIM (Nomor Induk Mahasiswa)
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: 2310111001"
-                    value={nim}
-                    onChange={(e) => setNim(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-teal-600 font-mono shadow-2xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    Angkatan
-                  </label>
-                  <select
-                    value={angkatan}
-                    onChange={(e) => setAngkatan(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-teal-600 font-mono shadow-2xs"
-                  >
-                    {COHORTS.map((c) => (
-                      <option key={c} value={c}>
-                        Angkatan {c}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Primary Submit Button */}
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full mt-2 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs shadow-md shadow-teal-900/20 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {submitting ? (
-                    <span>Memverifikasi Peserta Ujian...</span>
-                  ) : (
-                    <>
-                      <UserCheck className="w-4 h-4" />
-                      <span>Masuk Ruang Ujian CBT Sekarang</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Optional: Google Sign-In or Vercel Info */}
-              {typeof window !== 'undefined' && window.location.hostname.includes('vercel.app') ? (
-                <div className="mt-4 pt-3 border-t border-slate-100">
-                  <div className="p-3 rounded-xl bg-teal-50/80 border border-teal-200 text-center text-xs text-teal-950">
-                    <p className="font-bold text-teal-900">Login Peserta CBT Mandiri Aktif</p>
-                    <p className="text-[11px] text-teal-800/80 mt-0.5">
-                      Cukup masukkan Nama, NIM, dan Angkatan Anda pada formulir di atas untuk langsung memulai ujian.
+              {/* STEP 1: BEFORE GOOGLE LOGIN — MUST LOGIN WITH GOOGLE ACCOUNT FIRST */}
+              {!user ? (
+                <div className="space-y-4">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-left">
+                    <div className="flex items-center gap-2 mb-2 text-slate-800 font-bold text-xs">
+                      <Mail className="w-4 h-4 text-teal-600" />
+                      <span>Wajib Masuk Menggunakan Akun Google Mahasiswa</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Sesuai peraturan CBT FEB UPN “Veteran” Jakarta, seluruh peserta ujian wajib masuk menggunakan akun Google resmi universitas (<b>@upnvj.ac.id</b> / <b>@mahasiswa.upnvj.ac.id</b> atau akun Google terdaftar).
                     </p>
                   </div>
-                </div>
-              ) : (
-                <div className="mt-4 pt-3 border-t border-slate-100">
+
+                  {/* Primary Google Login Button */}
                   <button
                     type="button"
                     disabled={googleLoading}
                     onClick={handleGoogleLogin}
-                    className="w-full flex items-center justify-center gap-2.5 py-2.5 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
+                    className="w-full flex items-center justify-center gap-3 py-3.5 px-4 rounded-2xl bg-white border-2 border-teal-600/40 hover:border-teal-600 hover:bg-teal-50/50 text-slate-800 text-xs font-bold shadow-md hover:shadow-lg transition-all cursor-pointer disabled:opacity-50"
                   >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
                       <path
                         fill="#4285F4"
                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -296,28 +281,209 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSucce
                         d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                       />
                     </svg>
-                    <span>{googleLoading ? 'Menghubungkan...' : 'Atau Tautkan Akun Google (@upnvj.ac.id)'}</span>
+                    <span>
+                      {googleLoading
+                        ? 'Menghubungkan Akun Google...'
+                        : 'Masuk dengan Akun Google (@upnvj.ac.id)'}
+                    </span>
                   </button>
+                  <p className="text-[10px] text-slate-400 text-center">
+                    Klik tombol di atas untuk login melalui sistem Single Sign-On (SSO) Google
+                  </p>
+                </div>
+              ) : (
+                /* STEP 2: AFTER GOOGLE LOGIN SUCCEEDS — FILL IN / CONFIRM NAMA, NIM & ANGKATAN */
+                <div className="space-y-4">
+                  {/* Google Authenticated Status Card */}
+                  <div className="p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-left">
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <div className="w-8 h-8 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center flex-shrink-0 text-emerald-700">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div className="truncate">
+                        <p className="text-[11px] font-bold text-emerald-950 truncate">
+                          {user.displayName || 'Mahasiswa UPNVJ'}
+                        </p>
+                        <p className="text-[10px] text-emerald-700 font-mono truncate">
+                          {user.email}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => logout()}
+                      className="inline-flex items-center gap-1 text-[11px] text-rose-600 hover:text-rose-800 hover:underline font-semibold ml-2 flex-shrink-0 cursor-pointer"
+                      title="Ganti Akun Google"
+                    >
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Ganti</span>
+                    </button>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-2 text-left">
+                    <h4 className="text-xs font-bold text-slate-800">
+                      Konfirmasi Identitas Mahasiswa CBT
+                    </h4>
+                    <p className="text-[10px] text-slate-500 mb-3">
+                      Lengkapi data berikut untuk memasuki ruang ujian. Sistem akan memvalidasi data Anda.
+                    </p>
+
+                    <form onSubmit={handleStudentValidation} className="space-y-3.5">
+                      
+                      {/* 1. Nama Lengkap Input */}
+                      <div>
+                        <label className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1">
+                          <span className="flex items-center gap-1.5">
+                            <UserIcon className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Nama Lengkap Mahasiswa</span>
+                          </span>
+                          {fieldError.field === 'nama' && (
+                            <span className="text-[10px] font-semibold text-rose-600">Periksa Nama</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Contoh: Nadhif Ramadhan"
+                          value={namaLengkap}
+                          onChange={(e) => {
+                            setNamaLengkap(e.target.value);
+                            if (fieldError.field === 'nama') setFieldError({ field: null, message: null });
+                          }}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-slate-900 text-xs focus:outline-none focus:ring-2 shadow-2xs transition-all ${
+                            fieldError.field === 'nama'
+                              ? 'border-rose-400 ring-2 ring-rose-200'
+                              : 'border-slate-300 focus:ring-teal-600'
+                          }`}
+                        />
+                        {fieldError.field === 'nama' && (
+                          <p className="text-[10px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                            <span>{fieldError.message}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      {/* 2. NIM Input */}
+                      <div>
+                        <label className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1">
+                          <span className="flex items-center gap-1.5">
+                            <Hash className="w-3.5 h-3.5 text-slate-400" />
+                            <span>NIM (Nomor Induk Mahasiswa — 10 Digit)</span>
+                          </span>
+                          {fieldError.field === 'nim' && (
+                            <span className="text-[10px] font-semibold text-rose-600">Periksa NIM</span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          maxLength={10}
+                          placeholder="Contoh: 2310111001"
+                          value={nim}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, '');
+                            setNim(val);
+                            if (val.length >= 2) {
+                              const prefix = val.substring(0, 2);
+                              const targetYear = `20${prefix}`;
+                              if (COHORTS.includes(targetYear)) {
+                                setAngkatan(targetYear);
+                              }
+                            }
+                            if (fieldError.field === 'nim' || fieldError.field === 'angkatan') {
+                              setFieldError({ field: null, message: null });
+                            }
+                          }}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-slate-900 text-xs font-mono focus:outline-none focus:ring-2 shadow-2xs transition-all ${
+                            fieldError.field === 'nim'
+                              ? 'border-rose-400 ring-2 ring-rose-200'
+                              : 'border-slate-300 focus:ring-teal-600'
+                          }`}
+                        />
+                        {fieldError.field === 'nim' && (
+                          <p className="text-[10px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                            <span>{fieldError.message}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      {/* 3. Angkatan Select */}
+                      <div>
+                        <label className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                            <span>Tahun Angkatan</span>
+                          </span>
+                          {fieldError.field === 'angkatan' && (
+                            <span className="text-[10px] font-semibold text-rose-600">Periksa Angkatan</span>
+                          )}
+                        </label>
+                        <select
+                          value={angkatan}
+                          onChange={(e) => {
+                            setAngkatan(e.target.value);
+                            if (fieldError.field === 'angkatan') setFieldError({ field: null, message: null });
+                          }}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border bg-white text-slate-900 text-xs font-mono focus:outline-none focus:ring-2 shadow-2xs transition-all ${
+                            fieldError.field === 'angkatan'
+                              ? 'border-rose-400 ring-2 ring-rose-200'
+                              : 'border-slate-300 focus:ring-teal-600'
+                          }`}
+                        >
+                          {COHORTS.map((c) => (
+                            <option key={c} value={c}>
+                              Angkatan {c}
+                            </option>
+                          ))}
+                        </select>
+                        {fieldError.field === 'angkatan' && (
+                          <p className="text-[10px] font-semibold text-rose-600 mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                            <span>{fieldError.message}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Primary Submit Button */}
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full mt-2 inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-teal-800 hover:bg-teal-700 text-white font-bold text-xs shadow-md shadow-teal-900/20 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {submitting ? (
+                          <span>Memvalidasi Data Peserta...</span>
+                        ) : (
+                          <>
+                            <UserCheck className="w-4 h-4" />
+                            <span>Verifikasi & Masuk Dashboard CBT Sekarang</span>
+                            <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  </div>
                 </div>
               )}
 
-              {/* 1-Click Fast Demo Simulator */}
-              <div className="mt-3 pt-3 border-t border-dashed border-slate-200">
+              {/* 1-Click Fast Demo Simulator (Always available at bottom for instant testing) */}
+              <div className="mt-5 pt-3 border-t border-dashed border-slate-200">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 text-center mb-2 flex items-center justify-center gap-1">
                   <Sparkles className="w-3 h-3 text-amber-500" />
-                  <span>Uji Coba Cepat 1-Klik</span>
+                  <span>Uji Coba Cepat 1-Klik (Penguji / Demo)</span>
                 </p>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => handleQuickDemoFill('cbt-s1-akuntansi', '2310111001', 'Nadhif Ramadhan', '2026')}
+                    onClick={() => handleQuickDemoFill('cbt-s1-akuntansi', '2310111001', 'Nadhif Ramadhan', '2023')}
                     className="p-2 rounded-xl bg-teal-50/80 border border-teal-200 text-[11px] font-semibold text-teal-900 hover:bg-teal-100 text-left transition-colors cursor-pointer"
                   >
                     ⚡ Demo S1 Akuntansi
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleQuickDemoFill('cbt-s1-manajemen', '2410112045', 'Siti Rahmawati', '2025')}
+                    onClick={() => handleQuickDemoFill('cbt-s1-manajemen', '2410112045', 'Siti Rahmawati', '2024')}
                     className="p-2 rounded-xl bg-amber-50/80 border border-amber-200 text-[11px] font-semibold text-amber-900 hover:bg-amber-100 text-left transition-colors cursor-pointer"
                   >
                     ⚡ Demo S1 Manajemen
