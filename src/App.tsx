@@ -52,6 +52,7 @@ const MainApp: React.FC = () => {
       window.location.hash = 'peraturan-ketentuan';
       document.title = 'Peraturan & Ketentuan Ujian — CBT FEB UPNVJ';
     } else if (currentView === 'admin') {
+      window.location.hash = 'admin';
       document.title = 'Panel Administrator CBT FEB UPNVJ';
     } else {
       window.location.hash = '';
@@ -64,7 +65,8 @@ const MainApp: React.FC = () => {
     const checkSecretAdminAccess = () => {
       const hash = window.location.hash.toLowerCase();
       const search = window.location.search.toLowerCase();
-      if (hash.includes('admin') || search.includes('admin')) {
+      const pathname = window.location.pathname.toLowerCase();
+      if (hash.includes('admin') || search.includes('admin') || pathname.includes('admin')) {
         if (isAdmin && adminUser?.email.toLowerCase().trim() === 'nadhiframadhan780@gmail.com') {
           setCurrentView('admin');
         } else {

@@ -11,7 +11,8 @@ import {
   orderBy, 
   serverTimestamp,
   writeBatch,
-  deleteField
+  deleteField,
+  onSnapshot
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
@@ -995,6 +996,109 @@ export async function getAllAttempts(): Promise<ExamAttempt[]> {
   } catch (error) {
     handleFirestoreError(error, OperationType.LIST, 'examAttempts');
     return [];
+  }
+}
+
+/**
+ * REAL-TIME LISTENERS & INSTANT SYNC DISPATCH
+ * Ensures 0ms delay for live monitoring, submitted answers, and exam publications.
+ */
+
+// Instant browser broadcast channel
+export function notifyRealtimeChange(type: 'exams' | 'attempts' | 'students' | 'questions') {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('cbt-realtime-update', { detail: { type, timestamp: Date.now() } }));
+  }
+}
+
+export function listenRealtimeChanges(callback: (type: string) => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const handler = (e: Event) => {
+    const custom = e as CustomEvent;
+    callback(custom.detail?.type || 'all');
+  };
+  window.addEventListener('cbt-realtime-update', handler);
+  return () => window.removeEventListener('cbt-realtime-update', handler);
+}
+
+// 1. Real-time Attempts Listener (Monitoring & Violations)
+export function subscribeToAllAttempts(callback: (attempts: ExamAttempt[]) => void): () => void {
+  try {
+    const q = collection(db, 'examAttempts');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const attempts: ExamAttempt[] = [];
+      snapshot.forEach(d => {
+        attempts.push({ id: d.id, ...d.data() } as ExamAttempt);
+      });
+      callback(attempts);
+    }, (error) => {
+      console.warn('Real-time attempts listener error:', error);
+    });
+    return unsubscribe;
+  } catch (e) {
+    console.warn('subscribeToAllAttempts failed:', e);
+    return () => {};
+  }
+}
+
+// 2. Real-time Exams Listener (Scheduled vs Live publication)
+export function subscribeToAllExams(callback: (exams: Exam[]) => void): () => void {
+  try {
+    const q = collection(db, 'exams');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const exams: Exam[] = [];
+      snapshot.forEach(d => {
+        exams.push({ id: d.id, ...d.data() } as Exam);
+      });
+      callback(exams);
+    }, (error) => {
+      console.warn('Real-time exams listener error:', error);
+    });
+    return unsubscribe;
+  } catch (e) {
+    console.warn('subscribeToAllExams failed:', e);
+    return () => {};
+  }
+}
+
+// 3. Real-time Students Listener
+export function subscribeToStudents(callback: (students: StudentProfile[]) => void): () => void {
+  try {
+    const q = collection(db, 'students');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const students: StudentProfile[] = [];
+      snapshot.forEach(d => {
+        students.push({ id: d.id, ...d.data() } as StudentProfile);
+      });
+      callback(students);
+    }, (error) => {
+      console.warn('Real-time students listener error:', error);
+    });
+    return unsubscribe;
+  } catch (e) {
+    console.warn('subscribeToStudents failed:', e);
+    return () => {};
+  }
+}
+
+// 4. Real-time Questions Listener for specific Exam
+export function subscribeToQuestions(examId: string, callback: (questions: Question[]) => void): () => void {
+  if (!examId) return () => {};
+  try {
+    const q = collection(db, 'exams', examId, 'questions');
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const questions: Question[] = [];
+      snapshot.forEach(d => {
+        questions.push({ id: d.id, ...d.data() } as Question);
+      });
+      callback(questions);
+    }, (error) => {
+      console.warn('Real-time questions listener error:', error);
+    });
+    return unsubscribe;
+  } catch (e) {
+    console.warn('subscribeToQuestions failed:', e);
+    return () => {};
   }
 }
 

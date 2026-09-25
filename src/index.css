@@ -68,3 +68,55 @@
 .animate-float-delayed {
   animation: float 7s ease-in-out 2s infinite;
 }
+
+/* ============================================================== */
+/* OFFICIAL ACADEMIC DOCUMENT PRINT STYLES                        */
+/* ============================================================== */
+@media print {
+  /* Default print cleanup for screen-only elements */
+  header, footer, nav, .print\:hidden {
+    display: none !important;
+  }
+
+  /* When official printable document modal is active, isolate only the document sheet */
+  body:has(#printable-official-document) * {
+    visibility: hidden;
+  }
+
+  body:has(#printable-official-document) #printable-official-document,
+  body:has(#printable-official-document) #printable-official-document * {
+    visibility: visible;
+  }
+
+  /* Anchor printable sheet to top-left of paper */
+  #printable-official-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  /* A4 Page Formatting */
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm 12mm 15mm;
+  }
+
+  /* Avoid awkward breaks inside tables or headers */
+  table, tr, td, th, h1, h2, h3, h4, h5, .no-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Preserve sharp colors and backgrounds in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+

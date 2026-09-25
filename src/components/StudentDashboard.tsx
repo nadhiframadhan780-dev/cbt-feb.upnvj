@@ -2,8 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { STUDY_PROGRAMS, UPNVJ_LOGO, PRODI_COURSES_MAP } from '../constants/programs';
 import { Exam, CourseGrade } from '../types';
-import { getExamsForStudent, getStudentGrades } from '../services/firestoreService';
+import { 
+  getExamsForStudent, 
+  getStudentGrades, 
+  subscribeToAllExams, 
+  listenRealtimeChanges 
+} from '../services/firestoreService';
 import { formatIndonesianDate, formatIndonesianTime, formatCountdown } from '../utils/formatters';
+import { OfficialPrintableProof, PrintableDocumentType } from './OfficialPrintableProof';
+import { RealtimeClock } from './RealtimeClock';
 import { 
   Clock, 
   Calendar, 
@@ -53,6 +60,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
   const [gradesData, setGradesData] = useState<{ grades: CourseGrade[]; averageScore: number; gpa: number } | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<number>(student?.semester || 1);
   const [loadingGrades, setLoadingGrades] = useState(false);
+  const [printableDoc, setPrintableDoc] = useState<PrintableDocumentType | null>(null);
 
   const currentProgram = STUDY_PROGRAMS.find(p => p.slug === (student?.programSlug || selectedProgramSlug));
 
@@ -64,11 +72,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch exams strictly for this student's prodi and cohort
+  // Fetch exams strictly for this student's prodi and cohort with real-time updates
   useEffect(() => {
+    if (!student) return;
+
     async function loadExams() {
       if (!student) return;
-      setLoading(true);
       try {
         const data = await getExamsForStudent(student.programSlug, student.cohort);
         setExams(data);
@@ -78,7 +87,32 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
         setLoading(false);
       }
     }
+
     loadExams();
+
+    // Real-time listener for instantly published or scheduled exams
+    const unsubExams = subscribeToAllExams((allLiveExams) => {
+      if (!student) return;
+      if (allLiveExams && allLiveExams.length > 0) {
+        const studentExams = allLiveExams.filter(e => {
+          const matchProgram = e.programSlug === student.programSlug || (e.targetPrograms && e.targetPrograms.includes(student.programSlug));
+          const matchCohort = (e.targetCohorts && e.targetCohorts.includes(student.cohort));
+          return matchProgram && matchCohort && e.active !== false;
+        });
+        if (studentExams.length > 0) {
+          setExams(studentExams);
+        }
+      }
+    });
+
+    const unsubEvents = listenRealtimeChanges(() => {
+      loadExams();
+    });
+
+    return () => {
+      unsubExams();
+      unsubEvents();
+    };
   }, [student]);
 
   // Load integrated grades (Requirement 6)
@@ -169,6 +203,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             <LogOut className="w-3.5 h-3.5 text-rose-600" />
             <span>Keluar Sesi</span>
           </button>
+
+          <RealtimeClock variant="badge" />
         </div>
 
         {/* Main View Mode Selector (Exams, Profile, Grades) */}
@@ -263,6 +299,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
               )}
             </span>
           </div>
+
+          {/* Action: Print Official Exam Card */}
+          <button
+            onClick={() => setPrintableDoc('exam_card')}
+            className="p-3 px-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-850 hover:bg-teal-100 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-xs"
+            title="Cetak Kartu Tanda Peserta Ujian Resmi (UPNVJ, FEB, & Prodi)"
+          >
+            <Printer className="w-4 h-4 text-teal-700" />
+            <span className="hidden sm:inline">Cetak Kartu Ujian</span>
+          </button>
 
           <button
             onClick={() => setLogoutModalOpen(true)}
@@ -697,11 +743,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
                 </div>
 
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => setPrintableDoc('transcript')}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+                  title="Cetak Transkrip Nilai Resmi dengan Kop Surat & Logo"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Cetak Transkrip</span>
+                  <Printer className="w-3.5 h-3.5 text-teal-700" />
+                  <span>Cetak Transkrip Resmi</span>
                 </button>
               </div>
             </div>
@@ -808,6 +855,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Official Printable Proof Modal & Print Layout */}
+      {printableDoc && (
+        <OfficialPrintableProof
+          documentType={printableDoc}
+          student={student}
+          gradesData={gradesData}
+          selectedSemester={selectedSemester}
+          onClose={() => setPrintableDoc(null)}
+        />
       )}
 
     </div>

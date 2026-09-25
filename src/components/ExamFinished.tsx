@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Exam, StudentProfile } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { UPNVJ_LOGO } from '../constants/programs';
+import { OfficialPrintableProof } from './OfficialPrintableProof';
 import { 
   CheckCircle2, 
   Award, 
@@ -34,6 +35,7 @@ export const ExamFinished: React.FC<ExamFinishedProps> = ({
   onLogoutAndExit
 }) => {
   const { logout } = useAuth();
+  const [showPrintProof, setShowPrintProof] = useState(false);
   const isDisqualified = result.score === 0 && result.percentage === 0;
 
   const handleLogoutAndExit = async () => {
@@ -167,11 +169,11 @@ export const ExamFinished: React.FC<ExamFinishedProps> = ({
         {/* Action Buttons with Complete Logout Option (Requirement 10) */}
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
-            onClick={() => window.print()}
+            onClick={() => setShowPrintProof(true)}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
           >
             <Printer className="w-4 h-4 text-slate-500" />
-            <span>Cetak Bukti</span>
+            <span>Cetak Bukti Resmi</span>
           </button>
 
           <button
@@ -198,6 +200,17 @@ export const ExamFinished: React.FC<ExamFinishedProps> = ({
         </div>
 
       </div>
+
+      {/* Official Printable Proof Modal & Print Layout */}
+      {showPrintProof && (
+        <OfficialPrintableProof
+          documentType="exam_result"
+          student={student}
+          exam={exam}
+          result={result}
+          onClose={() => setShowPrintProof(false)}
+        />
+      )}
     </div>
   );
 };

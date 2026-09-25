@@ -25,9 +25,10 @@ interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (programSlug: string) => void;
+  onOpenAdminLogin?: () => void;
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSuccess, onOpenAdminLogin }) => {
   const { 
     user, 
     student, 

@@ -30,8 +30,14 @@ import {
   saveQuestion,
   deleteQuestion,
   saveBulkQuestions,
-  getAllAttempts
+  getAllAttempts,
+  subscribeToAllAttempts,
+  subscribeToAllExams,
+  subscribeToStudents,
+  subscribeToQuestions,
+  listenRealtimeChanges
 } from '../services/firestoreService';
+import { RealtimeClock } from './RealtimeClock';
 import { STUDY_PROGRAMS, COHORTS, SEMESTERS, PRODI_COURSES_MAP } from '../constants/programs';
 import { 
   downloadQuestionTemplate, 
@@ -160,20 +166,70 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
   const [schedPublishTime, setSchedPublishTime] = useState<string>(activeExam?.publishTime || '08:00');
   const [schedDuration, setSchedDuration] = useState<number>(activeExam?.durationMinutes || 90);
 
-  // Load initial data
+  // Real-time synchronization for zero-delay attempts, exams, students, and questions
   useEffect(() => {
     loadAllData();
+
+    // 1. Real-time Attempts Listener (Student exam status, live violations, submission scores)
+    const unsubAttempts = subscribeToAllAttempts((liveAttempts) => {
+      if (liveAttempts && liveAttempts.length > 0) {
+        setAttempts(liveAttempts);
+      }
+    });
+
+    // 2. Real-time Exams Listener (Scheduled vs instant publication)
+    const unsubExams = subscribeToAllExams((liveExams) => {
+      if (liveExams && liveExams.length > 0) {
+        setExams(liveExams);
+      }
+    });
+
+    // 3. Real-time Students Listener
+    const unsubStudents = subscribeToStudents((liveStudents) => {
+      if (liveStudents && liveStudents.length > 0) {
+        setStudents(liveStudents);
+      }
+    });
+
+    // 4. Cross-tab instant sync listener
+    const unsubEvents = listenRealtimeChanges(() => {
+      getAllAttempts().then(att => { if (att.length) setAttempts(att); }).catch(() => {});
+      getAllExams().then(ex => { if (ex.length) setExams(ex); }).catch(() => {});
+      getAllStudents().then(std => { if (std.length) setStudents(std); }).catch(() => {});
+    });
+
+    // 5. Active Heartbeat Polling every 3s to guarantee real-time proctoring updates
+    const heartbeat = setInterval(() => {
+      getAllAttempts().then(att => {
+        if (att && att.length > 0) setAttempts(att);
+      }).catch(() => {});
+    }, 3000);
+
+    return () => {
+      unsubAttempts();
+      unsubExams();
+      unsubStudents();
+      unsubEvents();
+      clearInterval(heartbeat);
+    };
   }, []);
 
-  // Update schedule inputs when selected exam changes
+  // Update schedule inputs and listen to real-time questions when selected exam changes
   useEffect(() => {
     if (activeExam) {
       setSchedPublishDate(activeExam.publishDate || '');
       setSchedPublishTime(activeExam.publishTime || '08:00');
       setSchedDuration(activeExam.durationMinutes || 90);
       loadQuestions(activeExam.id);
+
+      const unsubQ = subscribeToQuestions(activeExam.id, (liveQuestions) => {
+        if (liveQuestions && liveQuestions.length > 0) {
+          setExamQuestions(liveQuestions);
+        }
+      });
+      return () => unsubQ();
     }
-  }, [selectedExamId, activeExam]);
+  }, [selectedExamId, activeExam?.id]);
 
   // Update default courses when semester changes in Add Student Modal
   useEffect(() => {
@@ -640,6 +696,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
             <span className="text-xs font-bold text-slate-700">Administrator Panel FEB</span>
           </div>
+
+          <RealtimeClock variant="badge" />
         </div>
 
         {/* Admin Logged In Identity */}

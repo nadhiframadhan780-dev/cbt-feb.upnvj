@@ -9,6 +9,7 @@ import {
   submitExamAttempt,
   recordViolation
 } from '../services/firestoreService';
+import { RealtimeClock } from './RealtimeClock';
 import { 
   Clock, 
   CheckCircle2, 
@@ -416,7 +417,9 @@ export const ExamRoom: React.FC<ExamRoomProps> = ({ exam, onFinishExam, onExit }
           </div>
 
           {/* Right Timer & Finish Action */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <RealtimeClock variant="compact" />
+
             {/* Real-Time Countdown Box */}
             <div className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl border font-mono font-bold text-sm shadow-xs ${
               isTimeCritical 
