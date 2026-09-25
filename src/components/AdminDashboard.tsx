@@ -368,13 +368,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
       return;
     }
 
-    let statusReason = editingStudent.statusReason;
+    const isAccountActive = editingStudent.status === 'active';
+    let statusReason: string | undefined = undefined;
     if (editingStudent.status === 'temporary_inactive') {
       statusReason = 'AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN';
     } else if (editingStudent.status === 'permanent_inactive') {
       statusReason = 'AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL "VETERAN" JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT';
-    } else {
-      statusReason = undefined;
     }
 
     const updatedProfile: StudentProfile = {
@@ -382,10 +381,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
       name: editingStudent.name.trim(),
       nim: editingStudent.nim.trim(),
       email: editingStudent.email?.trim() || `${editingStudent.nim.trim()}@mahasiswa.upnvj.ac.id`,
-      active: editingStudent.status === 'active',
-      statusReason,
+      status: editingStudent.status,
+      active: isAccountActive,
       updatedAt: new Date().toISOString()
     };
+
+    if (statusReason) {
+      updatedProfile.statusReason = statusReason;
+    } else {
+      delete updatedProfile.statusReason;
+    }
 
     const ok = await saveStudentProfile(updatedProfile);
     if (ok) {
@@ -460,11 +465,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
       order,
       type: newQ.type || 'multiple_choice',
       question: newQ.question.trim(),
-      imageUrl: newQ.imageUrl?.trim() || undefined,
-      options: (newQ.type === 'multiple_choice' || newQ.type === 'multiple_choice_image') ? newQ.options : undefined,
       correctAnswer: newQ.correctAnswer || 'A',
       points: Number(newQ.points) || 10
     };
+
+    if (newQ.imageUrl?.trim()) {
+      questionObj.imageUrl = newQ.imageUrl.trim();
+    }
+    if (newQ.type === 'multiple_choice' || newQ.type === 'multiple_choice_image') {
+      questionObj.options = newQ.options;
+    }
 
     const ok = await saveQuestion(questionObj);
     if (ok) {
@@ -547,9 +557,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToHome }) 
     const updatedQuestion: Question = {
       ...editingQuestion,
       question: editingQuestion.question.trim(),
-      points: Number(editingQuestion.points) || 10,
-      imageUrl: editingQuestion.imageUrl?.trim() || undefined
+      points: Number(editingQuestion.points) || 10
     };
+
+    if (editingQuestion.imageUrl?.trim()) {
+      updatedQuestion.imageUrl = editingQuestion.imageUrl.trim();
+    } else {
+      delete updatedQuestion.imageUrl;
+    }
 
     const ok = await saveQuestion(updatedQuestion);
     if (ok) {

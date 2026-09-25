@@ -10,7 +10,8 @@ import {
   where, 
   orderBy, 
   serverTimestamp,
-  writeBatch
+  writeBatch,
+  deleteField
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { 
@@ -27,6 +28,40 @@ import {
   CourseGrade
 } from '../types';
 import { STUDY_PROGRAMS, PRODI_COURSES_MAP } from '../constants/programs';
+
+/**
+ * Recursively cleans an object before writing to Firestore, stripping any fields whose value is undefined.
+ * Firestore strictly rejects undefined with: "Function setDoc() called with invalid data. Unsupported field value: undefined".
+ * Leaves FieldValues (like deleteField(), serverTimestamp()), Dates, and primitive values untouched.
+ */
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object') {
+    // Preserve Date
+    if (data instanceof Date) return data;
+    // Preserve Firestore FieldValue, Timestamp, FieldPath
+    if (
+      '_methodName' in (data as any) ||
+      typeof (data as any).toMillis === 'function' ||
+      (data.constructor && (data.constructor.name === 'FieldValue' || data.constructor.name === 'Timestamp' || data.constructor.name === 'FieldPath'))
+    ) {
+      return data;
+    }
+    const cleanObj: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleanObj[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleanObj as T;
+  }
+  return data;
+}
 
 // Default initial Dean Profile
 export const DEFAULT_DEAN_PROFILE: DeanProfile = {
@@ -451,10 +486,11 @@ export async function getDeanProfile(): Promise<DeanProfile> {
 
 export async function updateDeanProfile(profile: DeanProfile): Promise<boolean> {
   try {
-    await setDoc(doc(db, 'deanProfile', 'current'), {
+    const payload = sanitizeForFirestore({
       ...profile,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    });
+    await setDoc(doc(db, 'deanProfile', 'current'), payload, { merge: true });
     return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, 'deanProfile/current');
@@ -521,20 +557,52 @@ export async function getAllStudents(): Promise<StudentProfile[]> {
 
 // Service: Save / Add Student
 export async function saveStudentProfile(student: StudentProfile): Promise<boolean> {
+  const isAccountActive = student.status ? student.status === 'active' : student.active;
+  const determinedStatus: StudentAccountStatus = student.status || (isAccountActive ? 'active' : 'temporary_inactive');
+
+  const defaultReason = 
+    determinedStatus === 'temporary_inactive'
+      ? 'AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN'
+      : determinedStatus === 'permanent_inactive'
+      ? 'AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL "VETERAN" JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT'
+      : undefined;
+
+  const finalReason = isAccountActive ? undefined : (student.statusReason || defaultReason);
+
   // Always cache in localStorage as resilient offline fallback
   try {
-    localStorage.setItem(`cbt_student_${student.nim}`, JSON.stringify(student));
+    const cachedStudent = {
+      ...student,
+      status: determinedStatus,
+      active: isAccountActive,
+      statusReason: finalReason
+    };
+    localStorage.setItem(`cbt_student_${student.nim}`, JSON.stringify(cachedStudent));
     if (student.email) {
-      localStorage.setItem(`cbt_student_email_${student.email.toLowerCase().trim()}`, JSON.stringify(student));
+      localStorage.setItem(`cbt_student_email_${student.email.toLowerCase().trim()}`, JSON.stringify(cachedStudent));
     }
   } catch {}
 
   try {
     const studentRef = doc(db, 'students', student.nim);
-    await setDoc(studentRef, {
+
+    // Sanitize any undefined properties first so Firestore never throws "Unsupported field value: undefined"
+    const payload = sanitizeForFirestore({
       ...student,
+      status: determinedStatus,
+      active: isAccountActive,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    }) as Record<string, any>;
+
+    // Handle statusReason specifically:
+    // If active, delete field in Firestore so old inactive reason is purged
+    if (isAccountActive) {
+      payload.statusReason = deleteField();
+    } else if (finalReason) {
+      payload.statusReason = finalReason;
+    }
+
+    await setDoc(studentRef, payload, { merge: true });
     return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `students/${student.nim}`);
@@ -549,10 +617,16 @@ export async function saveBulkStudents(students: StudentProfile[]): Promise<numb
     const batch = writeBatch(db);
     for (const std of students) {
       const ref = doc(db, 'students', std.nim);
-      batch.set(ref, {
+      const isAccountActive = std.status ? std.status === 'active' : (std.active ?? true);
+      const determinedStatus: StudentAccountStatus = std.status || (isAccountActive ? 'active' : 'temporary_inactive');
+
+      const cleanStd = sanitizeForFirestore({
         ...std,
+        status: determinedStatus,
+        active: isAccountActive,
         updatedAt: new Date().toISOString()
-      }, { merge: true });
+      });
+      batch.set(ref, cleanStd, { merge: true });
       count++;
     }
     await batch.commit();
@@ -583,22 +657,30 @@ export async function updateStudentAccountStatus(
   status: StudentAccountStatus,
   statusReason?: string
 ): Promise<boolean> {
-  const reason = statusReason || (
+  const defaultReason = 
     status === 'temporary_inactive' 
       ? 'AKUN ANDA NONAKTIF SEMENTARA WAKTU DIKARENAKAN TIDAK HADIR DALAM HARI UJIAN'
       : status === 'permanent_inactive'
       ? 'AKUN ANDA NONAKTIF PERMANEN DIKARENAKAN ANDA TIDAK HADIR DALAM WAKTU 1 BULAN DAN SUDAH KELUAR DARI UNIVERSITAS PEMBANGUNAN NASIONAL "VETERAN" JAKARTA, JIKA INI KELIRU ATAU MERASA KESALAHAN DATA SILAHKAN HUBUNGI LEBIH LANJUT'
-      : undefined
-  );
+      : undefined;
+
+  const finalReason = status === 'active' ? undefined : (statusReason || defaultReason);
 
   try {
     const studentRef = doc(db, 'students', nim);
-    await setDoc(studentRef, {
+    const updatePayload: Record<string, any> = {
       status,
       active: status === 'active',
-      statusReason: reason,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    };
+
+    if (status === 'active') {
+      updatePayload.statusReason = deleteField();
+    } else if (finalReason) {
+      updatePayload.statusReason = finalReason;
+    }
+
+    await setDoc(studentRef, updatePayload, { merge: true });
 
     // Update local cache
     try {
@@ -607,7 +689,11 @@ export async function updateStudentAccountStatus(
         const parsed = JSON.parse(cached);
         parsed.status = status;
         parsed.active = status === 'active';
-        parsed.statusReason = reason;
+        if (status === 'active') {
+          delete parsed.statusReason;
+        } else {
+          parsed.statusReason = finalReason;
+        }
         localStorage.setItem(`cbt_student_${nim}`, JSON.stringify(parsed));
       }
     } catch {}
@@ -669,10 +755,11 @@ export async function getAllExams(): Promise<Exam[]> {
 // Service: Save / Update Exam
 export async function saveExam(exam: Exam): Promise<boolean> {
   try {
-    await setDoc(doc(db, 'exams', exam.id), {
+    const payload = sanitizeForFirestore({
       ...exam,
       updatedAt: new Date().toISOString()
-    }, { merge: true });
+    });
+    await setDoc(doc(db, 'exams', exam.id), payload, { merge: true });
     return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `exams/${exam.id}`);
@@ -702,7 +789,8 @@ export async function getQuestionsForExam(examId: string): Promise<Question[]> {
 // Service: Save / Update Question
 export async function saveQuestion(question: Question): Promise<boolean> {
   try {
-    await setDoc(doc(db, 'questions', question.id), question, { merge: true });
+    const payload = sanitizeForFirestore(question);
+    await setDoc(doc(db, 'questions', question.id), payload, { merge: true });
     return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `questions/${question.id}`);
@@ -717,7 +805,7 @@ export async function saveBulkQuestions(questions: Question[]): Promise<number> 
     const batch = writeBatch(db);
     for (const q of questions) {
       const ref = doc(db, 'questions', q.id);
-      batch.set(ref, q, { merge: true });
+      batch.set(ref, sanitizeForFirestore(q), { merge: true });
       count++;
     }
     await batch.commit();
@@ -763,7 +851,7 @@ export async function getOrCreateExamAttempt(examId: string, student: StudentPro
       violationCount: 0
     };
 
-    await setDoc(attemptRef, newAttempt);
+    await setDoc(attemptRef, sanitizeForFirestore(newAttempt));
     return newAttempt;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'examAttempts');
