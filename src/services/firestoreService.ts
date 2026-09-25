@@ -473,19 +473,25 @@ export async function getStudentProfile(email: string, nim?: string): Promise<St
         return { id: nimSnap.docs[0].id, ...nimSnap.docs[0].data() } as StudentProfile;
       }
     }
-
-    // Fallback search local default students
-    const localMatch = DEFAULT_STUDENTS.find(s => 
-      s.email.toLowerCase() === email.toLowerCase() || (nim && s.nim === nim.trim())
-    );
-    return localMatch || null;
   } catch (error) {
     handleFirestoreError(error, OperationType.GET, 'students');
-    const localMatch = DEFAULT_STUDENTS.find(s => 
-      s.email.toLowerCase() === email.toLowerCase() || (nim && s.nim === nim.trim())
-    );
-    return localMatch || null;
   }
+
+  // Fallback 1: check local storage cached profile
+  try {
+    if (nim) {
+      const cached = localStorage.getItem(`cbt_student_${nim.trim()}`);
+      if (cached) return JSON.parse(cached);
+    }
+    const cachedByEmail = localStorage.getItem(`cbt_student_email_${email.toLowerCase().trim()}`);
+    if (cachedByEmail) return JSON.parse(cachedByEmail);
+  } catch {}
+
+  // Fallback 2: search local default students
+  const localMatch = DEFAULT_STUDENTS.find(s => 
+    s.email.toLowerCase() === email.toLowerCase() || (nim && s.nim === nim.trim())
+  );
+  return localMatch || null;
 }
 
 // Service: All Students (for Admin)
@@ -508,6 +514,14 @@ export async function getAllStudents(): Promise<StudentProfile[]> {
 
 // Service: Save / Add Student
 export async function saveStudentProfile(student: StudentProfile): Promise<boolean> {
+  // Always cache in localStorage as resilient offline fallback
+  try {
+    localStorage.setItem(`cbt_student_${student.nim}`, JSON.stringify(student));
+    if (student.email) {
+      localStorage.setItem(`cbt_student_email_${student.email.toLowerCase().trim()}`, JSON.stringify(student));
+    }
+  } catch {}
+
   try {
     const studentRef = doc(db, 'students', student.nim);
     await setDoc(studentRef, {

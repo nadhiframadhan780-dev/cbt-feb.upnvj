@@ -1,59 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Admins Collection
-    match /admins/{adminId} {
-      allow read, write: if true;
-    }
-
-    // Dean Profile & Sambutan Dekan
-    match /deanProfile/{docId} {
-      allow read, write: if true;
-    }
-
-    // Announcements
-    match /announcements/{announcementId} {
-      allow read, write: if true;
-    }
-
-    // Study Programs
-    match /programs/{programId} {
-      allow read, write: if true;
-    }
-
-    // Courses
-    match /courses/{courseId} {
-      allow read, write: if true;
-    }
-
-    // Students Collection (Data Mahasiswa FEB)
-    match /students/{studentId} {
-      allow read, write: if true;
-    }
-
-    // Exams Collection (Jadwal & Konfigurasi Ujian)
-    match /exams/{examId} {
-      allow read, write: if true;
-    }
-
-    // Questions Collection (Bank Soal CBT)
-    match /questions/{questionId} {
-      allow read, write: if true;
-    }
-
-    // Exam Attempts Collection (Sesi Pengerjaan & Nilai)
-    match /examAttempts/{attemptId} {
-      allow read, write: if true;
-    }
-
-    // Answers Collection (Jawaban Tersimpan)
-    match /answers/{answerId} {
-      allow read, write: if true;
-    }
-
-    // Settings Collection (Konfigurasi Sistem)
-    match /settings/{settingId} {
+    // FEB UPNVJ CBT Platform - Global access rules for exams, students, and admin
+    match /{document=**} {
       allow read, write: if true;
     }
   }
